@@ -31,6 +31,7 @@
 #include "H5Iprivate.h"		/* IDs */
 #include "H5MMprivate.h"	/* Memory management */
 #include "H5Pprivate.h"
+#include "H5FLprivate.h"        /* Free lists                           */
 
 /****************/
 /* Local Macros */
