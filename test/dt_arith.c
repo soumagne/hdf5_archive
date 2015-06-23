@@ -71,6 +71,9 @@ typedef enum dtype_t {
 #if H5_SIZEOF_LONG_DOUBLE !=0
     FLT_LDOUBLE,
 #endif
+#if H5_SIZEOF_BOOL !=0
+    INT_BOOL,
+#endif
     OTHER
 } dtype_t;
 
@@ -4880,6 +4883,22 @@ run_integer_tests(const char *name)
     nerrors += test_conv_int_1(name, H5T_NATIVE_ULLONG, H5T_NATIVE_ULONG);
 #endif
     nerrors += test_conv_int_1(name, H5T_NATIVE_ULLONG, H5T_NATIVE_LLONG);
+#endif
+
+#if H5_SIZEOF_BOOL != 0
+    nerrors += test_conv_int_1(name, H5T_NATIVE_BOOL, H5T_NATIVE_UCHAR);
+    nerrors += test_conv_int_1(name, H5T_NATIVE_BOOL, H5T_NATIVE_SHORT);
+    nerrors += test_conv_int_1(name, H5T_NATIVE_BOOL, H5T_NATIVE_USHORT);
+    nerrors += test_conv_int_1(name, H5T_NATIVE_BOOL, H5T_NATIVE_INT);
+    nerrors += test_conv_int_1(name, H5T_NATIVE_BOOL, H5T_NATIVE_UINT);
+#if H5_SIZEOF_LONG != H5_SIZEOF_INT
+    nerrors += test_conv_int_1(name, H5T_NATIVE_BOOL, H5T_NATIVE_LONG);
+    nerrors += test_conv_int_1(name, H5T_NATIVE_BOOL, H5T_NATIVE_ULONG);
+#endif
+#if H5_SIZEOF_LONG_LONG != H5_SIZEOF_LONG
+    nerrors += test_conv_int_1(name, H5T_NATIVE_BOOL, H5T_NATIVE_LLONG);
+    nerrors += test_conv_int_1(name, H5T_NATIVE_BOOL, H5T_NATIVE_ULLONG);
+#endif
 #endif
 
     return nerrors;

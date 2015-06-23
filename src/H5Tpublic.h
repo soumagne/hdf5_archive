@@ -408,6 +408,7 @@ H5_DLLVAR hid_t H5T_VAX_F64_g;
 #if H5_SIZEOF_LONG_DOUBLE !=0
 #define H5T_NATIVE_LDOUBLE	(H5OPEN H5T_NATIVE_LDOUBLE_g)
 #endif
+
 #define H5T_NATIVE_B8		(H5OPEN H5T_NATIVE_B8_g)
 #define H5T_NATIVE_B16		(H5OPEN H5T_NATIVE_B16_g)
 #define H5T_NATIVE_B32		(H5OPEN H5T_NATIVE_B32_g)
@@ -496,6 +497,12 @@ H5_DLLVAR hid_t H5T_NATIVE_INT_LEAST64_g;
 H5_DLLVAR hid_t H5T_NATIVE_UINT_LEAST64_g;
 H5_DLLVAR hid_t H5T_NATIVE_INT_FAST64_g;
 H5_DLLVAR hid_t H5T_NATIVE_UINT_FAST64_g;
+
+/* C9x extra types */
+#if H5_SIZEOF_BOOL != 0
+#define H5T_NATIVE_BOOL         (H5OPEN H5T_NATIVE_BOOL_g)
+H5_DLLVAR hid_t H5T_NATIVE_BOOL_g;
+#endif
 
 /* Operations defined on all datatypes */
 H5_DLL hid_t H5Tcreate(H5T_class_t type, size_t size);

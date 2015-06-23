@@ -83,8 +83,10 @@ H5T_init_native_interface(void)
  *                      H5T_NATIVE_DOUBLE
  *                      H5T_NATIVE_LDOUBLE
  *
+ *                      H5T_NATIVE_BOOL
+ *
  *              Compound, array, enum, and VL types all choose among these
- *              types for theire members.  Time, Bifield, Opaque, Reference
+ *              types for their members.  Time, Bifield, Opaque, Reference
  *              types are only copy out.
  *
  * Return:      Success:        Returns the native data type if successful.

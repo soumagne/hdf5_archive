@@ -409,6 +409,11 @@ hid_t H5T_NATIVE_UINT_LEAST64_g		= FAIL;
 hid_t H5T_NATIVE_INT_FAST64_g		= FAIL;
 hid_t H5T_NATIVE_UINT_FAST64_g		= FAIL;
 
+/* Extra C9x types. */
+#if H5_SIZEOF_BOOL != 0
+hid_t H5T_NATIVE_BOOL_g             = FAIL;
+#endif
+
 /*
  * Alignment constraints for native types. These are initialized at run time
  * in H5Tinit.c.  These alignments are mainly for offsets in HDF5 compound
@@ -488,6 +493,13 @@ size_t H5T_NATIVE_INT_LEAST64_ALIGN_g	= 0;
 size_t H5T_NATIVE_UINT_LEAST64_ALIGN_g	= 0;
 size_t H5T_NATIVE_INT_FAST64_ALIGN_g	= 0;
 size_t H5T_NATIVE_UINT_FAST64_ALIGN_g	= 0;
+
+/*
+ * Alignment constraints for extra C9x types.
+ */
+#if H5_SIZEOF_BOOL !=0
+size_t H5T_NATIVE_BOOL_ALIGN_g          = 0;
+#endif
 
 /* Useful floating-point values for conversion routines */
 /* (+/- Inf for all floating-point types) */
@@ -1533,6 +1545,10 @@ H5T_term_interface(void)
         H5T_NATIVE_UINT_LEAST64_g		= FAIL;
         H5T_NATIVE_INT_FAST64_g		= FAIL;
         H5T_NATIVE_UINT_FAST64_g		= FAIL;
+
+#if H5_SIZEOF_BOOL !=0
+        H5T_NATIVE_BOOL_g               = FAIL;
+#endif
 
 	/* Mark interface as closed */
 	H5_interface_initialize_g = 0;

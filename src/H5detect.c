@@ -131,6 +131,7 @@ static void detect_C89_integers(void);
 static void detect_C89_floats(void);
 static void detect_C99_integers(void);
 static void detect_C99_floats(void);
+static void detect_C99_extras(void);
 static void detect_C99_integers8(void);
 static void detect_C99_integers16(void);
 static void detect_C99_integers32(void);
@@ -1637,6 +1638,31 @@ detect_C99_floats(void)
 
 
 /*-------------------------------------------------------------------------
+ * Function:    detect_C99_extras
+ *
+ * Purpose: Detect C99 extra types
+ *
+ * Return:  void
+ *
+ *-------------------------------------------------------------------------
+ */
+static void
+detect_C99_extras(void)
+{
+    /* _Bool type */
+#if H5_SIZEOF_BOOL > 0
+  #if H5_SIZEOF_BOOL == 1
+    DETECT_BYTE(bool, BOOL, d_g[nd_g]); nd_g++;
+  #else
+    DETECT_I(bool, BOOL, d_g[nd_g]); nd_g++;
+  #endif
+#endif
+
+    /* _Complex type (float/double/long double) */
+}
+
+
+/*-------------------------------------------------------------------------
  * Function:	detect_alignments
  *
  * Purpose:	Detect structure alignments
@@ -1783,6 +1809,9 @@ main(void)
 
     /* C99 floating point types */
     detect_C99_floats();
+
+    /* C99 extra types */
+    detect_C99_extras();
 
     /* Detect structure alignment */
     detect_alignments();

@@ -1210,6 +1210,10 @@ H5_trace(const double *returning, const char *func, const char *type, ...)
                                     fprintf(out, "H5T_STD_B64BE");
                                 else if(obj == H5T_STD_B64LE_g)
                                     fprintf(out, "H5T_STD_B64LE");
+#if H5_SIZEOF_BOOL !=0
+                                else if(obj == H5T_NATIVE_BOOL_g)
+                                    fprintf(out, "H5T_NATIVE_BOOL");
+#endif
                                 else if(obj == H5T_C_S1_g)
                                     fprintf(out, "H5T_C_S1");
                                 else if(obj == H5T_FORTRAN_S1_g)

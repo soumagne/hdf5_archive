@@ -92,12 +92,6 @@ typedef struct complex_t {
     double                  im;
 } complex_t;
 
-typedef enum dtype_t {
-    INT_SCHAR, INT_UCHAR, INT_SHORT, INT_USHORT, INT_INT, INT_UINT,
-    INT_LONG, INT_ULONG, INT_LLONG, INT_ULLONG, FLT_FLOAT, FLT_DOUBLE,
-    FLT_LDOUBLE, OTHER
-} dtype_t;
-
 /* Constant for size of conversion buffer for int <-> float exception test */
 #define CONVERT_SIZE    4
 
@@ -163,6 +157,9 @@ reset_hdf5(void)
     SET_ALIGNMENT(DOUBLE,  H5_SIZEOF_DOUBLE);
 #if H5_SIZEOF_LONG_DOUBLE !=0
     SET_ALIGNMENT(LDOUBLE, H5_SIZEOF_LONG_DOUBLE);
+#endif
+#if H5_SIZEOF_BOOL !=0
+    SET_ALIGNMENT(BOOL,    H5_SIZEOF_BOOL);
 #endif
 #endif
 

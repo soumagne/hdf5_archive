@@ -375,6 +375,11 @@ H5_DLLVAR size_t	H5T_NATIVE_UINT_LEAST64_ALIGN_g;
 H5_DLLVAR size_t	H5T_NATIVE_INT_FAST64_ALIGN_g;
 H5_DLLVAR size_t	H5T_NATIVE_UINT_FAST64_ALIGN_g;
 
+/* C9x extra types */
+#if H5_SIZEOF_BOOL != 0
+H5_DLLVAR size_t    H5T_NATIVE_BOOL_ALIGN_g;
+#endif
+
 /* Useful floating-point values for conversion routines */
 /* (+/- Inf for all floating-point types) */
 H5_DLLVAR float H5T_NATIVE_FLOAT_POS_INF_g;
@@ -1243,6 +1248,18 @@ H5_DLL herr_t H5T__conv_ldouble_ullong(hid_t src_id, hid_t dst_id,
 				     size_t buf_stride, size_t bkg_stride,
                                      void *buf, void *bkg,
                                      hid_t dset_xfer_plist);
+#if H5_SIZEOF_BOOL != 0
+H5_DLL herr_t H5T__conv_bool_schar(hid_t src_id, hid_t dst_id,
+                     H5T_cdata_t *cdata, size_t nelmts,
+                     size_t buf_stride, size_t bkg_stride,
+                                     void *buf, void *bkg,
+                                     hid_t dset_xfer_plist);
+H5_DLL herr_t H5T__conv_bool_uchar(hid_t src_id, hid_t dst_id,
+                     H5T_cdata_t *cdata, size_t nelmts,
+                     size_t buf_stride, size_t bkg_stride,
+                                     void *buf, void *bkg,
+                                     hid_t dset_xfer_plist);
+#endif
 
 /* Bit twiddling functions */
 H5_DLL void H5T__bit_copy(uint8_t *dst, size_t dst_offset, const uint8_t *src,
