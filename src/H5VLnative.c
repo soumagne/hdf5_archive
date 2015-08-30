@@ -607,12 +607,9 @@ H5VL_native_attr_open(void *obj, H5VL_loc_params_t loc_params, const char *attr_
         HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a file or file object")
 
     if(loc_params.type == H5VL_OBJECT_BY_SELF) { /* H5Aopen */
-        /* Read in attribute from object header */
-        if(NULL == (attr = H5O_attr_open_by_name(loc.oloc, attr_name, dxpl_id)))
-            HGOTO_ERROR(H5E_ATTR, H5E_CANTINIT, NULL, "unable to load attribute info from object header for attribute: '%s'", attr_name)
-        /* Finish initializing attribute */
-        if(H5A__open_common(&loc, attr) < 0)
-            HGOTO_ERROR(H5E_ATTR, H5E_CANTINIT, NULL, "unable to initialize attribute")
+        /* Open the attribute */
+        if(NULL == (attr = H5A_open(&loc, attr_name, dxpl_id)))
+            HGOTO_ERROR(H5E_ATTR, H5E_CANTINIT, NULL, "unable to open attribute: '%s'", attr_name)
     }
     else if(loc_params.type == H5VL_OBJECT_BY_NAME) { /* H5Aopen_by_name */
         /* Open the attribute on the object header */
@@ -3270,7 +3267,7 @@ H5VL_native_object_specific(void *obj, H5VL_loc_params_t loc_params, H5VL_object
                     HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a dataspace")
 
                 /* Create reference */
-                if(H5R_create(ref, &loc, name, ref_type, space, dxpl_id) < 0)
+                if(H5R_create(ref, &loc, name, NULL, ref_type, space, dxpl_id) < 0)
                     HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to create reference")
 
                 break;

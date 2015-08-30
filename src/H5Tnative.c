@@ -217,10 +217,36 @@ H5T_get_native_type(H5T_t *dtype, H5T_direction_t direction, size_t *struct_alig
         case H5T_REFERENCE:
             {
                 if(NULL == (ret_value = H5T_copy(dtype, H5T_COPY_TRANSIENT)))
-                    HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "cannot copy reference type")
+                    HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "cannot retrieve float type")
+
+                /* Decide if the datatype is an object reference. */
+                if(NULL == (dt = (H5T_t *)H5I_object(H5T_STD_REF_OBJ_g)))
+                    HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a datatype")
+                not_equal = H5T_cmp(ret_value, dt, FALSE);
 
                 /* Update size, offset and compound alignment for parent. */
-                if(H5T_cmp_offset(comp_size, offset, sizeof(href_ff_t), (size_t)1, H5T_HREF_COMP_ALIGN_g, struct_align) < 0)
+                if(!not_equal) {
+                    align = H5T_HOBJREF_COMP_ALIGN_g;
+                    ref_size = sizeof(hobj_ref_t);
+                } /* end if */
+                else {
+                    /* Decide if the datatype is a dataset region or attribute reference. */
+                    if(NULL == (dt = (H5T_t *)H5I_object(H5T_STD_REF_DSETREG_g)))
+                        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a datatype")
+                    not_equal = H5T_cmp(ret_value, dt, FALSE);
+
+                    /* Update size, offset and compound alignment for parent. */
+                    if(!not_equal) {
+                        align = H5T_HDSETREGREF_COMP_ALIGN_g;
+                        ref_size = sizeof(hdset_reg_ref_t);
+                    } /* end if */
+                    else {
+                        align = H5T_HATTRREF_COMP_ALIGN_g;
+                        ref_size = sizeof(hattr_ref_t);
+                    } /* end else */
+                } /* end else */
+
+                if(H5T_cmp_offset(comp_size, offset, ref_size, (size_t)1, align, struct_align) < 0)
                     HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "cannot compute compound offset")
             } /* end case */
             break;
