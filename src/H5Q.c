@@ -219,21 +219,21 @@ done:
 int
 H5Q_term_package(void)
 {
-    int	n = 0;
+    int n = 0;
 
     FUNC_ENTER_NOAPI_NOINIT_NOERR
 
-    if(H5_PKG_INIT_VAR) {
-	if(H5I_nmembers(H5I_QUERY) > 0) {
-	    (void)H5I_clear_type(H5I_QUERY, FALSE, FALSE);
-            n++; /*H5I*/
-	} /* end if */
+    if (H5_interface_initialize_g) {
+        if ((n = (int) H5I_nmembers(H5I_QUERY))) {
+            H5I_clear_type(H5I_QUERY, FALSE, FALSE);
+        } /* end if */
         else {
-            n += (H5I_dec_type_ref(H5I_QUERY) > 0);
+            /* Free data types */
+            H5I_dec_type_ref(H5I_QUERY);
 
-            /* Mark closed */
-            if(0 == n)
-                H5_PKG_INIT_VAR = FALSE;
+            /* Shut down interface */
+            H5_interface_initialize_g = 0;
+            n = 1; /* H5I */
         } /* end else */
     } /* end if */
 
@@ -320,8 +320,9 @@ H5Qcreate(H5Q_type_t query_type, H5Q_match_op_t match_op, ...)
     va_end(ap);
 
     /* Register the new query object to get an ID for it */
-    if ((ret_value = H5I_register(H5I_QUERY, query, TRUE)) < 0)
+    if ((query->query_id = H5I_register(H5I_QUERY, query, TRUE)) < 0)
         HGOTO_ERROR(H5E_QUERY, H5E_CANTREGISTER, FAIL, "can't register query handle");
+    ret_value = query->query_id;
 
 done:
     FUNC_LEAVE_API(ret_value)
@@ -353,6 +354,7 @@ H5Q_create(H5Q_type_t query_type, H5Q_match_op_t match_op, ...)
         HGOTO_ERROR(H5E_QUERY, H5E_NOSPACE, NULL, "can't allocate query structure");
 
     query->is_combined = FALSE;
+    query->query_id = H5I_UNINIT;
     query->ref_count = 1;
     query->query.select.type = query_type;
     query->query.select.match_op = match_op;
@@ -540,8 +542,9 @@ H5Qcombine(hid_t query1_id, H5Q_combine_op_t combine_op, hid_t query2_id)
         HGOTO_ERROR(H5E_QUERY, H5E_CANTCREATE, FAIL, "unable to combine query objects");
 
     /* Register the new query object to get an ID for it */
-    if ((ret_value = H5I_register(H5I_QUERY, query, TRUE)) < 0)
+    if ((query->query_id = H5I_register(H5I_QUERY, query, TRUE)) < 0)
         HGOTO_ERROR(H5E_QUERY, H5E_CANTREGISTER, FAIL, "can't register query handle");
+    ret_value = query->query_id;
 
 done:
     FUNC_LEAVE_API(ret_value)
@@ -581,6 +584,7 @@ H5Q_combine(H5Q_t *query1, H5Q_combine_op_t combine_op, H5Q_t *query2)
             break;
     }
     query->is_combined = TRUE;
+    query->query_id = H5I_UNINIT;
     query->ref_count = 1;
     query->query.combine.l_query = query1;
     query1->ref_count++;
@@ -1019,8 +1023,9 @@ H5Qdecode(const void *buf)
         HGOTO_ERROR(H5E_QUERY, H5E_CANTDECODE, FAIL, "can't decode object");
 
     /* Register the type and return the ID */
-    if ((ret_value = H5I_register(H5I_QUERY, query, TRUE)) < 0)
+    if ((query->query_id = H5I_register(H5I_QUERY, query, TRUE)) < 0)
         HGOTO_ERROR(H5E_QUERY, H5E_CANTREGISTER, FAIL, "unable to register query");
+    ret_value = query->query_id;
 
 done:
     FUNC_LEAVE_API(ret_value)
@@ -1051,6 +1056,7 @@ H5Q_decode(const unsigned char **buf_ptr)
         HGOTO_ERROR(H5E_QUERY, H5E_NOSPACE, NULL, "can't allocate query structure");
 
     /* Set ref count */
+    query->query_id = H5I_UNINIT;
     query->ref_count = 1;
 
     H5Q_decode_memcpy(&query->is_combined, sizeof(hbool_t), buf_ptr);
@@ -1131,11 +1137,11 @@ done:
 } /* end H5Q_decode() */
 
 /*-------------------------------------------------------------------------
- * Function:    H5Qapply
+ * Function:    H5Qapply_singleton
  *
  * Purpose: Apply a query and return the result. Parameters, which the
  * query applies to, are determined by the type of the query.
- * It is an error to apply H5Qapply to a combined query object (one
+ * It is an error to apply H5Qapply_singleton to a combined query object (one
  * which was created with H5Qcombine).
  *
  * Return:  Non-negative on success/Negative on failure
@@ -1143,7 +1149,7 @@ done:
  *-------------------------------------------------------------------------
  */
 herr_t
-H5Qapply(hid_t query_id, hbool_t *result, ...)
+H5Qapply_singleton(hid_t query_id, hbool_t *result, ...)
 {
     H5Q_t *query = NULL;
     H5T_t *native_type = NULL;
@@ -1185,7 +1191,7 @@ H5Qapply(hid_t query_id, hbool_t *result, ...)
                 HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "cannot retrieve native type");
 
             /* Apply query */
-            if (FAIL == (ret_value = H5Q_apply(query, result, native_type, value)))
+            if (FAIL == (ret_value = H5Q_apply_singleton(query, result, native_type, value)))
                 HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
         }
         break;
@@ -1197,7 +1203,7 @@ H5Qapply(hid_t query_id, hbool_t *result, ...)
             attr_name = va_arg(ap, const char *);
 
             /* Apply query */
-            if (FAIL == (ret_value = H5Q_apply(query, result, attr_name)))
+            if (FAIL == (ret_value = H5Q_apply_singleton(query, result, attr_name)))
                 HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
         }
         break;
@@ -1209,7 +1215,7 @@ H5Qapply(hid_t query_id, hbool_t *result, ...)
             link_name = va_arg(ap, const char *);
 
             /* Apply query */
-            if (FAIL == (ret_value = H5Q_apply(query, result, link_name)))
+            if (FAIL == (ret_value = H5Q_apply_singleton(query, result, link_name)))
                 HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
         }
         break;
@@ -1234,8 +1240,6 @@ done:
  *
  * Purpose: Apply a query and return the result. Parameters, which the
  * query applies to, are determined by the type of the query.
- * It is an error to apply H5Qapply to a combined query object (one
- * which was created with H5Qcombine).
  *
  * Return:  Non-negative on success/Negative on failure
  *
@@ -1315,7 +1319,7 @@ H5Q_apply_combine(H5Q_t *query, hbool_t *result, H5T_t *type, const void *elem)
                  break;
          }
     } else {
-        if (FAIL == (ret_value = H5Q_apply(query, result, type, elem)))
+        if (FAIL == (ret_value = H5Q_apply_singleton(query, result, type, elem)))
             HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query")
     }
 
@@ -1324,16 +1328,16 @@ done:
 } /* end H5Q_apply_combine() */
 
 /*-------------------------------------------------------------------------
- * Function:    H5Q_apply
+ * Function:    H5Q_apply_singleton
  *
- * Purpose: Private function for H5Qapply.
+ * Purpose: Private function for H5Qapply_singleton.
  *
  * Return:  Non-negative on success/Negative on failure
  *
  *-------------------------------------------------------------------------
  */
 herr_t
-H5Q_apply(H5Q_t *query, hbool_t *result, ...)
+H5Q_apply_singleton(H5Q_t *query, hbool_t *result, ...)
 {
     herr_t ret_value = SUCCEED; /* Return value */
     va_list ap;
@@ -1464,7 +1468,7 @@ done:
 /*-------------------------------------------------------------------------
  * Function:    H5Q_apply_data_elem
  *
- * Purpose: Private function for H5Qapply (data element).
+ * Purpose: Private function for H5Qapply_singleton (data element).
  *
  * Return:  Non-negative on success/Negative on failure
  *
@@ -1581,7 +1585,7 @@ done:
 /*-------------------------------------------------------------------------
  * Function:    H5Q_apply_attr_name
  *
- * Purpose: Private function for H5Qapply (attribute name).
+ * Purpose: Private function for H5Qapply_singleton (attribute name).
  *
  * Return:  Non-negative on success/Negative on failure
  *
@@ -1616,7 +1620,7 @@ H5Q_apply_attr_name(H5Q_t *query, hbool_t *result, const char *name)
 /*-------------------------------------------------------------------------
  * Function:    H5Q_apply_link_name
  *
- * Purpose: Private function for H5Qapply (link name).
+ * Purpose: Private function for H5Qapply_singleton (link name).
  *
  * Return:  Non-negative on success/Negative on failure
  *
