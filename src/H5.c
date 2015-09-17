@@ -305,6 +305,7 @@ H5_term_library(void)
         pending += DOWN(D_top);
         pending += DOWN(G_top);
         pending += DOWN(R_top);
+        pending += DOWN(Q_top);
         pending += DOWN(S_top);
         pending += DOWN(T_top);
 #ifdef H5_HAVE_EFF

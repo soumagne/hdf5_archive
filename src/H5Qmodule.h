@@ -13,8 +13,8 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 /*
- * Programmer:	Mohamad Chaarawi
- *              Ocotber 2015
+ * Programmer:	Quincey Koziol <koziol@hdfgroup.org>
+ *		Saturday, September 12, 2015
  *
  * Purpose:	This file contains declarations which define macros for the
  *		H5Q package.  Including this header means that the source file
