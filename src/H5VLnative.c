@@ -660,7 +660,7 @@ H5VL_native_attr_read(void *attr, hid_t dtype_id, void *buf, hid_t dxpl_id, void
     if(NULL == (mem_type = (H5T_t *)H5I_object_verify(dtype_id, H5I_DATATYPE)))
         HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a datatype")
     /* Go write the actual data to the attribute */
-    if((ret_value = H5A__read((H5A_t*)attr, mem_type, buf, dxpl_id)) < 0)
+    if((ret_value = H5A_read((H5A_t*)attr, mem_type, buf, dxpl_id)) < 0)
         HGOTO_ERROR(H5E_ATTR, H5E_READERROR, FAIL, "unable to read attribute")
 
 done:
@@ -691,7 +691,7 @@ H5VL_native_attr_write(void *attr, hid_t dtype_id, const void *buf, hid_t dxpl_i
     if(NULL == (mem_type = (H5T_t *)H5I_object_verify(dtype_id, H5I_DATATYPE)))
         HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a datatype")
     /* Go write the actual data to the attribute */
-    if((ret_value = H5A__write((H5A_t*)attr, mem_type, buf, dxpl_id)) < 0)
+    if((ret_value = H5A_write((H5A_t*)attr, mem_type, buf, dxpl_id)) < 0)
         HGOTO_ERROR(H5E_ATTR, H5E_WRITEERROR, FAIL, "unable to write attribute")
 
 done:
@@ -789,7 +789,7 @@ H5VL_native_attr_get(void *obj, H5VL_attr_get_t get_type, hid_t dxpl_id, void H5
                 if(H5VL_OBJECT_BY_SELF == loc_params.type) {
                     attr = (H5A_t *)obj;
                     /* Call private function in turn */
-                    if(0 > (*ret_val = H5A__get_name(attr, buf_size, buf)))
+                    if(0 > (*ret_val = H5A_get_name(attr, buf_size, buf)))
                         HGOTO_ERROR(H5E_ATTR, H5E_CANTGET, FAIL, "can't get attribute name")
                 }
                 else if(H5VL_OBJECT_BY_IDX == loc_params.type) {
