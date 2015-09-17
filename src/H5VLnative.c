@@ -2310,14 +2310,8 @@ H5VL_native_group_create(void *obj, H5VL_loc_params_t loc_params, const char *na
 
     /* if name is NULL then this is from H5Gcreate_anon */
     if(name == NULL) {
-        H5G_obj_create_t gcrt_info;         /* Information for group creation */
-        /* Set up group creation info */
-        gcrt_info.gcpl_id = gcpl_id;
-        gcrt_info.cache_type = H5G_NOTHING_CACHED;
-        HDmemset(&gcrt_info.cache, 0, sizeof(gcrt_info.cache));
-
         /* Create the new group & get its ID */
-        if(NULL == (grp = H5G__create(loc.oloc->file, &gcrt_info, dxpl_id)))
+        if(NULL == (grp = H5G_create_anon(&loc, gcpl_id, gapl_id)))
             HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, NULL, "unable to create group")            
     }
     /* otherwise it's from H5Gcreate */
