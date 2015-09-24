@@ -228,7 +228,7 @@
     dt->shared->u.atomic.u.r.rtype = H5R_OBJECT;			      \
 }
 
-#define H5T_INIT_TYPE_REGREF_CORE {					      \
+#define H5T_INIT_TYPE_DSET_REGREF_CORE {					      \
     H5T_INIT_TYPE_REF_COMMON						      \
     dt->shared->u.atomic.u.r.rtype = H5R_DATASET_REGION;			      \
 }
@@ -251,6 +251,20 @@
 #define H5T_INIT_TYPE_EXTATTRREF_CORE {					      \
     H5T_INIT_TYPE_REF_COMMON						      \
     dt->shared->u.atomic.u.r.rtype = H5R_ATTR_EXT;			      \
+}
+
+#define H5T_INIT_TYPE_REGREF_CORE {                             \
+    H5T_INIT_TYPE_REF_COMMON                                    \
+    dt->shared->force_conv = TRUE;                              \
+    dt->shared->u.atomic.u.r.rtype = H5R_REGION;                \
+    dt->shared->u.atomic.u.r.loc = H5T_LOC_BADLOC;              \
+}
+
+#define H5T_INIT_TYPE_REGREF_CORE {                             \
+    H5T_INIT_TYPE_REF_COMMON                                    \
+    dt->shared->force_conv = TRUE;                              \
+    dt->shared->u.atomic.u.r.rtype = H5R_REGION;                \
+    dt->shared->u.atomic.u.r.loc = H5T_LOC_BADLOC;              \
 }
 
 #define H5T_INIT_TYPE_ATTRREF_CORE {					      \
@@ -370,6 +384,7 @@ hid_t H5T_STD_B64BE_g			= FAIL;
 hid_t H5T_STD_B64LE_g 			= FAIL;
 hid_t H5T_STD_REF_OBJ_g 		= FAIL;
 hid_t H5T_STD_REF_DSETREG_g 		= FAIL;
+hid_t H5T_STD_REF_REG_g                 = FAIL;
 hid_t H5T_STD_REF_ATTR_g 		= FAIL;
 
 hid_t H5T_UNIX_D32BE_g			= FAIL;
@@ -461,6 +476,7 @@ size_t H5T_POINTER_COMP_ALIGN_g	                = 0;
 size_t H5T_HVL_COMP_ALIGN_g	                = 0;
 size_t H5T_HOBJREF_COMP_ALIGN_g	                = 0;
 size_t H5T_HDSETREGREF_COMP_ALIGN_g	        = 0;
+size_t H5T_HREGREF_COMP_ALIGN_g                 = 0;
 size_t H5T_HATTRREF_COMP_ALIGN_g                = 0;
 
 /*
@@ -748,10 +764,6 @@ H5T__init_package(void)
     H5T_t	*array=NULL;            /* Datatype structure for array objects */
     H5T_t	*objref=NULL;           /* Datatype structure for object reference objects */
     H5T_t	*regref=NULL;           /* Datatype structure for region reference objects */
-    H5T_t	*attrref=NULL;          /* Datatype structure for attribute reference objects */
-    H5T_t	*extobjref=NULL;        /* Datatype structure for external object reference objects */
-    H5T_t	*extregref=NULL;        /* Datatype structure for external region reference objects */
-    H5T_t	*extattrref=NULL;       /* Datatype structure for external attribute reference objects */
     hsize_t     dim[1]={1};             /* Dimension info for array datatype */
     herr_t	status;
     unsigned    copied_dtype=1;         /* Flag to indicate whether datatype was copied or allocated (for error cleanup) */
@@ -1010,34 +1022,14 @@ H5T__init_package(void)
     objref = dt;    /* Keep type for later */
 
     /* Dataset Region reference (i.e. selection inside a dataset) */
-    H5T_INIT_TYPE(REGREF, H5T_STD_REF_DSETREG_g, ALLOC, -, NOSET, -)
-    if(H5T_set_loc(dt, NULL, H5T_LOC_MEMORY) < 0)
-        HGOTO_ERROR(H5E_DATATYPE, H5E_CANTINIT, FAIL, "invalid datatype location")
-    regref = dt;    /* Keep type for later */
-
-    /* Attribute reference (i.e. object and attribute names in file) */
-    H5T_INIT_TYPE(ATTRREF, H5T_STD_REF_ATTR_g, ALLOC, -, NOSET, -)
-    if(H5T_set_loc(dt, NULL, H5T_LOC_MEMORY) < 0)
-        HGOTO_ERROR(H5E_DATATYPE, H5E_CANTINIT, FAIL, "invalid datatype location")
-    attrref = dt;    /* Keep type for later */
-
-    /* Object reference (i.e. object header address in file) */
-    H5T_INIT_TYPE(EXTOBJREF, H5T_STD_REF_EXT_OBJ_g, ALLOC, -, NOSET, -)
-    if(H5T_set_loc(dt, NULL, H5T_LOC_MEMORY) < 0)
-        HGOTO_ERROR(H5E_DATATYPE, H5E_CANTINIT, FAIL, "invalid datatype location")
-    extobjref = dt;    /* Keep type for later */
+    H5T_INIT_TYPE(DSET_REGREF, H5T_STD_REF_DSETREG_g, ALLOC, -, SET, H5R_DSET_REG_REF_BUF_SIZE)
 
     /* Dataset Region reference (i.e. selection inside a dataset) */
-    H5T_INIT_TYPE(EXTREGREF, H5T_STD_REF_EXT_REG_g, ALLOC, -, NOSET, -)
+    H5T_INIT_TYPE(REGREF, H5T_STD_REF_REG_g, ALLOC, -, NOSET, -)
+    /* TODO put that in the macro */
     if(H5T_set_loc(dt, NULL, H5T_LOC_MEMORY) < 0)
-        HGOTO_ERROR(H5E_DATATYPE, H5E_CANTINIT, FAIL, "invalid datatype location")
-    extregref = dt;    /* Keep type for later */
-
-    /* Attribute reference (i.e. object and attribute names in file) */
-    H5T_INIT_TYPE(EXTATTRREF, H5T_STD_REF_EXT_ATTR_g, ALLOC, -, NOSET, -)
-    if(H5T_set_loc(dt, NULL, H5T_LOC_MEMORY) < 0)
-        HGOTO_ERROR(H5E_DATATYPE, H5E_CANTINIT, FAIL, "invalid datatype location")
-    extattrref = dt;    /* Keep type for later */
+        HGOTO_ERROR(H5E_DATATYPE, H5E_CANTINIT, NULL, "invalid datatype location")
+    regref = dt;    /* Keep type for later */
 
     /* Attribute reference (i.e. object and attribute names in file) */
     H5T_INIT_TYPE(ATTRREF, H5T_STD_REF_ATTR_g, ALLOC, -, SET, H5R_ATTR_REF_BUF_SIZE)
@@ -1075,9 +1067,8 @@ H5T__init_package(void)
     status |= H5T_register(H5T_PERS_SOFT, "enum_f", enum_type, floatpt, H5T__conv_enum_numeric, H5AC_ind_dxpl_id, FALSE);
     status |= H5T_register(H5T_PERS_SOFT, "vlen", vlen, vlen, H5T__conv_vlen, H5AC_ind_dxpl_id, FALSE);
     status |= H5T_register(H5T_PERS_SOFT, "array", array, array, H5T__conv_array, H5AC_ind_dxpl_id, FALSE);
-    status |= H5T_register(H5T_PERS_SOFT, "objref", objref, objref, H5T__conv_ref, H5AC_ind_dxpl_id, FALSE);
+    status |= H5T_register(H5T_PERS_SOFT, "objref", objref, objref, H5T__conv_order_opt, H5AC_ind_dxpl_id, FALSE);
     status |= H5T_register(H5T_PERS_SOFT, "regref", regref, regref, H5T__conv_ref, H5AC_ind_dxpl_id, FALSE);
-    status |= H5T_register(H5T_PERS_SOFT, "attrref", attrref, attrref, H5T__conv_ref, H5AC_ind_dxpl_id, FALSE);
 
     /*
      * Native conversions should be listed last since we can use hardware to
@@ -1508,6 +1499,7 @@ H5T_top_term_package(void)
             H5T_STD_B64LE_g 			= FAIL;
             H5T_STD_REF_OBJ_g 			= FAIL;
             H5T_STD_REF_DSETREG_g 		= FAIL;
+            H5T_STD_REF_REG_g			= FAIL;
             H5T_STD_REF_ATTR_g			= FAIL;
 
             H5T_UNIX_D32BE_g			= FAIL;
@@ -4405,27 +4397,12 @@ H5T_cmp(const H5T_t *dt1, const H5T_t *dt2, hbool_t superset)
                                 HGOTO_DONE(1);
                             break;
 
-                        case H5R_ATTR:
-                            /* Does this need more to distinguish it? -QAK 8/25/15 */
+                        case H5R_REGION:
+                    /* Does this need more to distinguish it? -QAK 8/25/15 */
                             /*void */
                             break;
 
-                        case H5R_OBJECT_EXT:
-                            /* Does this need more to distinguish it? -QAK 8/25/15 */
-                            /*void */
-                            break;
-
-                        case H5R_DATASET_REGION_EXT:
-                            /* Does this need more to distinguish it? -QAK 8/25/15 */
-                            /*void */
-                            break;
-
-                        case H5R_ATTR_EXT:
-                            /* Does this need more to distinguish it? -QAK 8/25/15 */
-                            /*void */
-                            break;
-
-                        case H5R_ATTR:
+                       case H5R_ATTR:
                     /* Does this need more to distinguish it? -QAK 8/25/15 */
                             /*void */
                             break;
@@ -5346,11 +5323,24 @@ H5T_set_loc(H5T_t *dt, H5F_t *f, H5T_loc_t loc)
                 break;
 
             case H5T_REFERENCE:
-                /* Mark this reference */
-                if((changed = H5T__ref_set_loc(dt, f, loc)) < 0)
-                    HGOTO_ERROR(H5E_DATATYPE, H5E_CANTINIT, FAIL, "Unable to set reference location");
-                if(changed > 0)
-                    ret_value = changed;
+                /* Only need to change location of object references */
+                if(dt->shared->u.atomic.u.r.rtype==H5R_OBJECT) {
+                    /* Mark this reference */
+                    if(loc!=dt->shared->u.atomic.u.r.loc) {
+                        /* Set the location */
+                        dt->shared->u.atomic.u.r.loc = loc;
+
+                        /* Indicate that the location changed */
+                        ret_value=TRUE;
+                    } /* end if */
+                } /* end if */
+                if(dt->shared->u.atomic.u.r.rtype == H5R_REGION) {
+                    /* Mark this reference */
+                    if((changed = H5T__ref_set_loc(dt, f, loc)) < 0)
+                        HGOTO_ERROR(H5E_DATATYPE, H5E_CANTINIT, FAIL, "Unable to set reference location");
+                    if(changed > 0)
+                        ret_value = changed;
+                }
                 break;
 
             case H5T_NO_CLASS:

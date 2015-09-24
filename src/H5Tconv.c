@@ -3566,7 +3566,7 @@ done:
 /*-------------------------------------------------------------------------
  * Function:    H5T__conv_ref
  *
- * Purpose: Converts between reference datatypes in memory and on disk.
+ * Purpose: Converts between region reference datatypes in memory and on disk.
  *      This is a soft conversion function.
  *
  * Return:  Non-negative on success/Negative on failure
@@ -3584,7 +3584,6 @@ H5T__conv_ref(hid_t src_id, hid_t dst_id, H5T_cdata_t *cdata, size_t nelmts,
     uint8_t *b = NULL;          /* background buffer                    */
     ssize_t s_stride, d_stride; /* src and dst strides                  */
     ssize_t b_stride;           /* bkg stride                           */
-    size_t  safe;               /* how many elements are safe to process in each pass */
     void    *conv_buf = NULL;   /* temporary conversion buffer          */
     size_t  conv_buf_size = 0;  /* size of conversion buffer in bytes   */
     size_t  elmtno;             /* element number counter               */
@@ -3617,16 +3616,11 @@ H5T__conv_ref(hid_t src_id, hid_t dst_id, H5T_cdata_t *cdata, size_t nelmts,
 
         case H5T_CONV_CONV:
         {
-            H5R_type_t ref_type;
-
             /*
              * Conversion.
              */
             if(NULL == (src = (H5T_t *)H5I_object(src_id)) || NULL == (dst = (H5T_t *)H5I_object(dst_id)))
                 HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a datatype")
-
-            /* Set reference type */
-            ref_type = src->shared->u.atomic.u.r.rtype;
 
             /* Initialize source & destination strides */
             if(buf_stride) {
@@ -3650,78 +3644,36 @@ H5T__conv_ref(hid_t src_id, hid_t dst_id, H5T_cdata_t *cdata, size_t nelmts,
             else
                 b_stride = 0;
 
-            /* The outer loop of the type conversion macro, controlling which */
-            /* direction the buffer is walked */
-            while(nelmts > 0) {
-                /* Check if we need to go backwards through the buffer */
-                if(d_stride > s_stride) {
-                    /* Sanity check */
-                    HDassert(s_stride > 0);
-                    HDassert(d_stride > 0);
-                    HDassert(b_stride >= 0);
+            /* Single forward pass over all data */
+            s = d = (uint8_t *)buf;
+            b = (uint8_t *)bkg;
 
-                    /* Compute the number of "safe" destination elements at */
-                    /* the end of the buffer (Those which don't overlap with */
-                    /* any source elements at the beginning of the buffer) */
-                    safe = nelmts - (((nelmts * (size_t)s_stride) + ((size_t)d_stride - 1)) / (size_t)d_stride);
+            for(elmtno = 0; elmtno < nelmts; elmtno++) {
+                size_t buf_size;
 
-                    /* If we're down to the last few elements, just wrap up */
-                    /* with a "real" reverse copy */
-                    if(safe < 2) {
-                        s = (uint8_t *)buf + (nelmts - 1) * (size_t)s_stride;
-                        d = (uint8_t *)buf + (nelmts - 1) * (size_t)d_stride;
-                        b = (uint8_t *)bkg + (nelmts - 1) * (size_t)b_stride;
-                        s_stride = -s_stride;
-                        d_stride = -d_stride;
-                        b_stride = -b_stride;
+                /* Get size of references */
+                if(0 == (buf_size = (*(src->shared->u.atomic.u.r.getsize))(s)))
+                    HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "incorrect length")
 
-                        safe = nelmts;
-                    } /* end if */
-                    else {
-                        s = (uint8_t *)buf + (nelmts - safe) * (size_t)s_stride;
-                        d = (uint8_t *)buf + (nelmts - safe) * (size_t)d_stride;
-                        b = (uint8_t *)bkg + (nelmts - safe) * (size_t)b_stride;
-                    } /* end else */
-                } /* end if */
-                else {
-                    /* Single forward pass over all data */
-                    s = d = (uint8_t *)buf;
-                    b = (uint8_t *)bkg;
-                    safe = nelmts;
-                } /* end else */
+                /* Check if conversion buffer is large enough, resize if necessary. */
+                conv_buf_size = buf_size;
+                if(NULL == (conv_buf = H5FL_BLK_REALLOC(ref_seq, conv_buf, conv_buf_size)))
+                    HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "memory allocation failed for type conversion")
+                HDmemset(conv_buf, 0, conv_buf_size);
 
-                for(elmtno = 0; elmtno < safe; elmtno++) {
-                    size_t buf_size;
+                /* Read reference */
+                if((*(src->shared->u.atomic.u.r.read))(src->shared->u.atomic.u.r.f, dxpl_id, s, conv_buf, buf_size) < 0)
+                    HGOTO_ERROR(H5E_DATATYPE, H5E_READERROR, FAIL, "can't read reference data")
 
-                    /* Get size of references */
-                    if(0 == (buf_size = (*(src->shared->u.atomic.u.r.getsize))(s)))
-                        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "incorrect size")
+                /* Write reference to destination location */
+                if((*(dst->shared->u.atomic.u.r.write))(dst->shared->u.atomic.u.r.f, dxpl_id, d, conv_buf, b, buf_size) < 0)
+                    HGOTO_ERROR(H5E_DATATYPE, H5E_WRITEERROR, FAIL, "can't write reference data")
 
-                    /* Check if conversion buffer is large enough, resize if necessary. */
-                    if(conv_buf_size < buf_size) {
-                        conv_buf_size = buf_size;
-                        if(NULL == (conv_buf = H5FL_BLK_REALLOC(ref_seq, conv_buf, conv_buf_size)))
-                            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "memory allocation failed for type conversion")
-                        HDmemset(conv_buf, 0, conv_buf_size);
-                    } /* end if */
-
-                    /* Read reference */
-                    if((*(src->shared->u.atomic.u.r.read))(src->shared->u.atomic.u.r.f, dxpl_id, s, conv_buf, buf_size) < 0)
-                        HGOTO_ERROR(H5E_DATATYPE, H5E_READERROR, FAIL, "can't read reference data")
-
-                    /* Write reference to destination location */
-                    if((*(dst->shared->u.atomic.u.r.write))(dst->shared->u.atomic.u.r.f, dxpl_id, d, conv_buf, b, buf_size, ref_type) < 0)
-                        HGOTO_ERROR(H5E_DATATYPE, H5E_WRITEERROR, FAIL, "can't write reference data")
-
-                    /* Advance pointers */
-                    s += s_stride;
-                    d += d_stride;
-                    b += b_stride;
-                } /* end for */
-
-                /* Decrement number of elements left to convert */
-                nelmts -= safe;
-            } /* end while */
+                /* Advance pointers */
+                s += s_stride;
+                d += d_stride;
+                b += b_stride;
+            } /* end for */
         } /* end case */
             break;
 
