@@ -80,8 +80,8 @@ H5_DLL H5A_t *H5A_open(const H5G_loc_t *loc, const char *attr_name, hid_t dxpl_i
 H5_DLL struct H5O_loc_t *H5A_oloc(H5A_t *attr);
 H5_DLL H5G_name_t *H5A_nameof(H5A_t *attr);
 H5_DLL H5T_t *H5A_type(const H5A_t *attr);
-H5_DLL hid_t H5A_get_type(H5A_t *attr);
-H5_DLL hid_t H5A_get_space(H5A_t *attr);
+H5_DLL H5T_t *H5A_get_type(H5A_t *attr);
+H5_DLL H5S_t *H5A_get_space(H5A_t *attr);
 H5_DLL herr_t H5A_close(H5A_t *attr);
 H5_DLL herr_t H5O_attr_iterate_real(hid_t loc_id, const H5O_loc_t *loc,
     hid_t dxpl_id, H5_index_t idx_type, H5_iter_order_t order, hsize_t skip,

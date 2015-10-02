@@ -725,9 +725,17 @@ H5VL_native_attr_get(void *obj, H5VL_attr_get_t get_type, hid_t dxpl_id, void H5
             {
                 hid_t	*ret_id = va_arg (arguments, hid_t *);
                 H5A_t   *attr = (H5A_t *)obj;
+                H5S_t   *ds = NULL;
 
-                if((*ret_id = H5A_get_space(attr)) < 0)
-                    HGOTO_ERROR(H5E_ARGS, H5E_CANTGET, FAIL, "can't get space ID of attribute")
+                if(NULL == (ds = H5A_get_space(attr)))
+                    HGOTO_ERROR(H5E_ARGS, H5E_CANTGET, FAIL, "can't get dataspace of attribute")
+
+                /* Atomize */
+                if((*ret_id = H5I_register(H5I_DATASPACE, ds, TRUE)) < 0) {
+                    if(ds && H5S_close(ds) < 0)
+                        HGOTO_ERROR(H5E_DATASPACE, H5E_CLOSEERROR, FAIL, "unable to release dataspace")
+                    HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register dataspace atom")
+                }
                 break;
             }
         /* H5Aget_type */
@@ -735,9 +743,27 @@ H5VL_native_attr_get(void *obj, H5VL_attr_get_t get_type, hid_t dxpl_id, void H5
             {
                 hid_t	*ret_id = va_arg (arguments, hid_t *);
                 H5A_t   *attr = (H5A_t *)obj;
+                H5T_t   *dt = NULL;
 
-                if((*ret_id = H5A_get_type(attr)) < 0)
-                    HGOTO_ERROR(H5E_ARGS, H5E_CANTGET, FAIL, "can't get datatype ID of attribute")
+                if(NULL == (dt = H5A_get_type(attr)))
+                    HGOTO_ERROR(H5E_ARGS, H5E_CANTGET, FAIL, "can't get datatype of attribute")
+                if(H5T_is_named(dt)) {
+                    /* If this is a committed datatype, we need to recreate the
+                       two level IDs, where the VOL object is a copy of the
+                       returned datatype */
+                    if((*ret_id = H5VL_native_register(H5I_DATATYPE, dt, TRUE)) < 0) {
+                        if(dt && H5T_close(dt) < 0)
+                            HGOTO_ERROR(H5E_DATATYPE, H5E_CLOSEERROR, FAIL, "unable to release datatype")
+                        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to atomize datatype")
+                    }
+                }
+                else {
+                    if((*ret_id = H5I_register(H5I_DATATYPE, dt, TRUE)) < 0) {
+                        if(dt && H5T_close(dt) < 0)
+                            HGOTO_ERROR(H5E_DATATYPE, H5E_CLOSEERROR, FAIL, "unable to release datatype")
+                        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register datatype")
+                    }
+                }
                 break;
             }
         /* H5Aget_create_plist */
