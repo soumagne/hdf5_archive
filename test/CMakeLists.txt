@@ -26,7 +26,11 @@ set (TEST_LIB_HEADERS
     ${HDF5_TEST_SOURCE_DIR}/h5test.h
 )
 
-add_library (${HDF5_TEST_LIB_TARGET} STATIC ${TEST_LIB_SRCS} ${TEST_LIB_HEADERS})
+# Use common object library for static and shared libraries
+add_library(${HDF5_TEST_LIB_CORENAME}_obj OBJECT ${TEST_LIB_SRCS} ${TEST_LIB_HEADERS})
+
+# Static library
+add_library (${HDF5_TEST_LIB_TARGET} STATIC $<TARGET_OBJECTS:${HDF5_TEST_LIB_CORENAME}_obj>)
 TARGET_C_PROPERTIES (${HDF5_TEST_LIB_TARGET} STATIC " " " ")
 if (MSVC)
   target_link_libraries (${HDF5_TEST_LIB_TARGET} "ws2_32.lib")
@@ -41,8 +45,9 @@ set_target_properties (${HDF5_TEST_LIB_TARGET} PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include>"
 )
 
+# Shared library
 if (BUILD_SHARED_LIBS)
-  add_library (${HDF5_TEST_LIBSH_TARGET} SHARED ${TEST_LIB_SRCS} ${TEST_LIB_HEADERS})
+  add_library (${HDF5_TEST_LIBSH_TARGET} SHARED $<TARGET_OBJECTS:${HDF5_TEST_LIB_CORENAME}_obj>)
   TARGET_C_PROPERTIES (${HDF5_TEST_LIBSH_TARGET} SHARED " " " ")
   if (MSVC)
     target_link_libraries (${HDF5_TEST_LIBSH_TARGET} "ws2_32.lib")

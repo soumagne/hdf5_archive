@@ -10,7 +10,11 @@ INCLUDE_DIRECTORIES (${HDF5_HL_CPP_SRC_SOURCE_DIR})
 set (HDF5_HL_CPP_SRCS ${HDF5_HL_CPP_SRC_SOURCE_DIR}/H5PacketTable.cpp)
 set (HDF5_HL_CPP_HDRS ${HDF5_HL_CPP_SRC_SOURCE_DIR}/H5PacketTable.h)
 
-add_library (${HDF5_HL_CPP_LIB_TARGET} STATIC ${HDF5_HL_CPP_SRCS})
+# Use common object library for static and shared libraries
+add_library(${HDF5_HL_CPP_LIB_CORENAME}_obj OBJECT ${HDF5_HL_CPP_SRCS})
+
+# Static library
+add_library (${HDF5_HL_CPP_LIB_TARGET} STATIC $<TARGET_OBJECTS:${HDF5_HL_CPP_LIB_CORENAME}_obj>)
 TARGET_C_PROPERTIES (${HDF5_HL_CPP_LIB_TARGET} STATIC " " " ")
 target_link_libraries (
     ${HDF5_HL_CPP_LIB_TARGET}
@@ -25,8 +29,9 @@ set_target_properties (${HDF5_HL_CPP_LIB_TARGET} PROPERTIES
 )
 set (install_targets ${HDF5_HL_CPP_LIB_TARGET})
 
+# Shared library
 if (BUILD_SHARED_LIBS)
-  add_library (${HDF5_HL_CPP_LIBSH_TARGET} SHARED ${HDF5_HL_CPP_SRCS})
+  add_library (${HDF5_HL_CPP_LIBSH_TARGET} SHARED $<TARGET_OBJECTS:${HDF5_HL_CPP_LIB_CORENAME}_obj>)
   TARGET_C_PROPERTIES (${HDF5_HL_CPP_LIBSH_TARGET} SHARED " " " ")
   target_link_libraries (
       ${HDF5_HL_CPP_LIBSH_TARGET}

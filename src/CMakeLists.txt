@@ -844,7 +844,11 @@ add_custom_command (
 #-----------------------------------------------------------------------------
 set (gen_SRCS ${HDF5_BINARY_DIR}/H5Tinit.c ${HDF5_BINARY_DIR}/H5lib_settings.c)
 
-add_library (${HDF5_LIB_TARGET} STATIC ${common_SRCS} ${gen_SRCS} ${H5_PUBLIC_HEADERS} ${H5_PRIVATE_HEADERS} ${H5_GENERATED_HEADERS})
+# Use common object library for static and shared libraries
+add_library(${HDF5_LIB_CORENAME}_obj OBJECT ${common_SRCS} ${H5_PUBLIC_HEADERS} ${H5_PRIVATE_HEADERS} ${H5_GENERATED_HEADERS})
+
+# Static library
+add_library (${HDF5_LIB_TARGET} STATIC $<TARGET_OBJECTS:${HDF5_LIB_CORENAME}_obj> ${gen_SRCS})
 TARGET_C_PROPERTIES (${HDF5_LIB_TARGET} STATIC " " " ")
 target_link_libraries (${HDF5_LIB_TARGET} ${LINK_LIBS})
 if (NOT WIN32)
@@ -869,6 +873,7 @@ if (HDF5_ENABLE_DEBUG_APIS)
 endif (HDF5_ENABLE_DEBUG_APIS)
 set (install_targets ${HDF5_LIB_TARGET})
 
+# Shared library
 if (BUILD_SHARED_LIBS)
   file (MAKE_DIRECTORY "${HDF5_BINARY_DIR}/shared")
   set (CMD $<TARGET_FILE:H5detect>)
@@ -888,7 +893,7 @@ if (BUILD_SHARED_LIBS)
       WORKING_DIRECTORY ${HDF5_BINARY_DIR}
   )
   set (shared_gen_SRCS ${HDF5_BINARY_DIR}/shared/H5Tinit.c ${HDF5_BINARY_DIR}/shared/H5lib_settings.c)
-  add_library (${HDF5_LIBSH_TARGET} SHARED ${common_SRCS} ${shared_gen_SRCS} ${H5_PUBLIC_HEADERS} ${H5_PRIVATE_HEADERS} ${H5_GENERATED_HEADERS})
+  add_library (${HDF5_LIBSH_TARGET} SHARED $<TARGET_OBJECTS:${HDF5_LIB_CORENAME}_obj> ${shared_gen_SRCS})
   TARGET_C_PROPERTIES (${HDF5_LIBSH_TARGET} SHARED " " " ")
   target_link_libraries (${HDF5_LIBSH_TARGET} ${LINK_SHARED_LIBS})
   if (NOT WIN32)
