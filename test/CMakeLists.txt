@@ -63,12 +63,6 @@ if (BUILD_SHARED_LIBS)
       INTERFACE_INCLUDE_DIRECTORIES "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include>"
       INTERFACE_COMPILE_DEFINITIONS H5_BUILT_AS_DYNAMIC_LIB=1
   )
-  if (HDF5_ENABLE_THREADSAFE)
-    set_property (TARGET ${HDF5_TEST_LIBSH_TARGET}
-        APPEND PROPERTY COMPILE_DEFINITIONS
-            "H5_HAVE_THREADSAFE"
-    )
-  endif (HDF5_ENABLE_THREADSAFE)
 endif (BUILD_SHARED_LIBS)
 
 #-----------------------------------------------------------------------------
@@ -313,12 +307,6 @@ if (BUILD_SHARED_LIBS)
   TARGET_C_PROPERTIES (hyperslab-shared SHARED " " " ")
   target_link_libraries (hyperslab-shared ${HDF5_TEST_LIBSH_TARGET} ${HDF5_LIBSH_TARGET})
   set_target_properties (hyperslab-shared PROPERTIES FOLDER test)
-  if (HDF5_ENABLE_THREADSAFE)
-    set_property (TARGET hyperslab-shared
-        APPEND PROPERTY COMPILE_DEFINITIONS
-            "H5_HAVE_THREADSAFE"
-    )
-  endif (HDF5_ENABLE_THREADSAFE)
 endif (BUILD_SHARED_LIBS)
 
 #-- Adding test for ttsafe
@@ -345,12 +333,6 @@ if (BUILD_SHARED_LIBS)
   TARGET_C_PROPERTIES (ttsafe-shared SHARED " " " ")
   target_link_libraries (ttsafe-shared ${HDF5_TEST_LIBSH_TARGET} ${HDF5_LIBSH_TARGET})
   set_target_properties (ttsafe-shared PROPERTIES FOLDER test)
-  if (HDF5_ENABLE_THREADSAFE)
-    set_property (TARGET ttsafe-shared
-        APPEND PROPERTY COMPILE_DEFINITIONS
-            "H5_HAVE_THREADSAFE"
-    )
-  endif (HDF5_ENABLE_THREADSAFE)
 endif (BUILD_SHARED_LIBS)
 
 #-- Adding test for err_compat
