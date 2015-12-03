@@ -142,7 +142,7 @@ H5Rget_obj_type1(hid_t id, H5R_type_t ref_type, const void *ref)
 
 done:
     FUNC_LEAVE_API(ret_value)
-}   /* end H5Rget_obj_type1() */
+} /* end H5Rget_obj_type1() */
 
 
 /*--------------------------------------------------------------------------
@@ -168,7 +168,7 @@ done:
  REVISION LOG
 --------------------------------------------------------------------------*/
 hid_t
-H5Rdereference1(hid_t obj_id, H5R_type_t ref_type, const void *_ref)
+H5Rdereference1(hid_t obj_id, H5R_type_t ref_type, const void *ref)
 {
     H5VL_object_t *obj = NULL;        /* object token of loc_id */
     H5I_type_t opened_type;
@@ -182,7 +182,7 @@ H5Rdereference1(hid_t obj_id, H5R_type_t ref_type, const void *_ref)
     /* Check args */
     if(ref_type <= H5R_BADTYPE || ref_type >= H5R_MAXTYPE)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid reference type")
-    if(_ref == NULL)
+    if(ref == NULL)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid reference pointer")
 
     /* get the vol object */
@@ -206,7 +206,7 @@ H5Rdereference1(hid_t obj_id, H5R_type_t ref_type, const void *_ref)
 
 done:
     FUNC_LEAVE_API(ret_value)
-}   /* end H5Rdereference1() */
+} /* end H5Rdereference1() */
 
 #endif /* H5_NO_DEPRECATED_SYMBOLS */
 
