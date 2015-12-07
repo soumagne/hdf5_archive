@@ -1,4 +1,4 @@
-#  Try to find AXE library and headers.
+#  Try to find the AXE library and headers.
 #  This file sets the following variables:
 #
 #  AXE_INCLUDE_DIR, where to find axe.h, etc.
@@ -8,31 +8,20 @@
 # Also defined, but not for general use are:
 #  AXE_LIBRARY, the full path to the axe library.
 
-FIND_PATH( AXE_INCLUDE_DIR axe.h
-  /usr/local/include
-  /usr/include
-)
+find_path(AXE_INCLUDE_DIR axe.h
+  HINTS /usr/local/include /usr/include)
 
-FIND_LIBRARY( AXE_LIBRARY NAMES axe
-  /usr/lib
-  /usr/local/lib
-)
+find_library(AXE_LIBRARY NAMES axe
+  PATHS /usr/local/lib /usr/lib)
 
-SET( AXE_FOUND "NO" )
-IF(AXE_INCLUDE_DIR)
-  IF(AXE_LIBRARY)
+set(AXE_INCLUDE_DIRS ${AXE_INCLUDE_DIR})
+set(AXE_LIBRARIES ${AXE_LIBRARY})
 
-    SET( AXE_LIBRARIES ${AXE_LIBRARY})
-    SET( AXE_FOUND "YES" )
+include(FindPackageHandleStandardArgs)
+# handle the QUIETLY and REQUIRED arguments and set AXE_FOUND to TRUE
+# if all listed variables are TRUE
+find_package_handle_standard_args(AXE DEFAULT_MSG
+                                  AXE_INCLUDE_DIR AXE_LIBRARY)
 
-  ELSE(AXE_LIBRARY)
-    IF(AXE_FIND_REQUIRED)
-      message(SEND_ERROR "Unable to find the requested AXE libraries.")
-    ENDIF(AXE_FIND_REQUIRED)
-  ENDIF(AXE_LIBRARY)
-ENDIF(AXE_INCLUDE_DIR)
+mark_as_advanced(AXE_INCLUDE_DIR AXE_LIBRARY)
 
-MARK_AS_ADVANCED(
-  AXE_INCLUDE_DIR
-  AXE_LIBRARY
-)
