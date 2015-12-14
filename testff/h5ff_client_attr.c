@@ -9,19 +9,37 @@
 #include "mpi.h"
 #include "hdf5.h"
 
+static herr_t
+iterate_cb(hid_t oid, const char *attr_name, const H5A_info_t *ainfo, void *udata, hid_t rcxt_id)
+{
+    hid_t aid;
+
+    printf("----------------------------------------\n");
+    printf("Iterating on Attribute %s\n", attr_name);
+    printf("----------------------------------------\n");
+
+    aid = H5Aopen_ff(oid, attr_name, H5P_DEFAULT, rcxt_id, H5_EVENT_STACK_NULL);
+    assert(aid >= 0);
+
+    assert(0 == H5Aclose_ff(aid, H5_EVENT_STACK_NULL));
+
+    return 0;
+}
+
 int main(int argc, char **argv) {
     char file_name[50];
     hid_t file_id;
     hid_t gid1;
     hid_t sid, dtid, stype_id;
     hid_t sid2;
-    hid_t did1, map;
+    hid_t did1, map1;
+    hid_t aid11, aid12, aid13;
     hid_t aid1, aid2, aid3, aid4, aid5;
     hid_t tid1, tid2, rid1, rid2, rid3;
     hid_t fapl_id, trspl_id;
     hid_t e_stack;
-    hbool_t exists1;
-    hbool_t exists2;
+    htri_t exists1;
+    htri_t exists2;
 
     uint64_t version;
     uint64_t trans_num;
@@ -59,7 +77,8 @@ int main(int argc, char **argv) {
 
     /* Choose the IOD VOL plugin to use with this file. */
     fapl_id = H5Pcreate (H5P_FILE_ACCESS);
-    H5Pset_fapl_iod(fapl_id, MPI_COMM_WORLD, MPI_INFO_NULL);
+    ret = H5Pset_fapl_iod(fapl_id, MPI_COMM_WORLD, MPI_INFO_NULL);
+    assert(0 == ret);
 
     /* set the metada data integrity checks to happend at transfer through mercury */
     cs_scope |= H5_CHECKSUM_TRANSFER;
@@ -74,8 +93,8 @@ int main(int argc, char **argv) {
     for(i=0;i<nelem;++i) {
         rdata1[i] = 0;
         rdata2[i] = 0;
-        wdata1[i]=i;
-        wdata2[i]=i*2;
+        wdata1[i] = i;
+        wdata2[i] = i*2;
     }
 
     /* create an event Queue for managing asynchronous requests. */
@@ -132,19 +151,29 @@ int main(int argc, char **argv) {
         assert(ret == 0);
 
         /* create a Map object on the root group */
-        map = H5Mcreate_ff(file_id, "MAP1", H5T_STD_I32LE, H5T_STD_I32LE, 
-                           H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT, tid1, e_stack);
-        assert(map > 0);
+        map1 = H5Mcreate_ff(file_id, "MAP1", H5T_STD_I32LE, H5T_STD_I32LE, 
+                            H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT, tid1, e_stack);
+        assert(map1 > 0);
 
         /* create an attribute on root group */
         aid1 = H5Acreate_ff(file_id, "ROOT_ATTR", dtid, sid, 
                             H5P_DEFAULT, H5P_DEFAULT, tid1, e_stack);
-        assert(aid1);
+        assert(aid1 > 0);
 
         /* create an attribute on group G1. */
         aid2 = H5Acreate_ff(gid1, "GROUP_ATTR", dtid, sid, 
                             H5P_DEFAULT, H5P_DEFAULT, tid1, e_stack);
-        assert(aid2);
+        assert(aid2 > 0);
+        aid11 = H5Acreate_ff(gid1, "ATTR1", dtid, sid, 
+                            H5P_DEFAULT, H5P_DEFAULT, tid1, e_stack);
+        assert(aid1 > 0);
+        aid12 = H5Acreate_ff(gid1, "ATTR2", dtid, sid, 
+                            H5P_DEFAULT, H5P_DEFAULT, tid1, e_stack);
+        assert(aid12 > 0);
+        aid13 = H5Acreate_ff(gid1, "ATTR3", dtid, sid, 
+                            H5P_DEFAULT, H5P_DEFAULT, tid1, e_stack);
+        assert(aid13 > 0);
+
 
         /* write data to attributes */
         ret = H5Awrite_ff(aid1, dtid, wdata1, tid1, e_stack);
@@ -160,16 +189,24 @@ int main(int argc, char **argv) {
         /* create an attribute on datatype */
         aid4 = H5Acreate_ff(dtid, "DTYPE_ATTR", dtid, sid, 
                             H5P_DEFAULT, H5P_DEFAULT, tid1, e_stack);
-        assert(aid4);
+        assert(aid4 > 0);
 
-
-        aid5 = H5Acreate_ff(map, "MAP_ATTR", stype_id, sid2, H5P_DEFAULT, 
+        aid5 = H5Acreate_ff(map1, "MAP_ATTR", stype_id, sid2, H5P_DEFAULT, 
                             H5P_DEFAULT, tid1, H5_EVENT_STACK_NULL );
-        assert(aid5);
+        assert(aid5 > 0);
+
         ret = H5Awrite_ff(aid5, stype_id, "/AA by rank 0", tid1, H5_EVENT_STACK_NULL ); 
         assert( ret == 0 );
 
         H5Sclose(sid2);
+
+        {
+            hid_t temp_sid;
+
+            temp_sid = H5Aget_space(aid5);
+            assert(temp_sid > 0);
+            H5Sclose(temp_sid);
+        }
 
         ret = H5Aclose_ff(aid1, e_stack);
         assert(ret == 0);
@@ -207,6 +244,12 @@ int main(int argc, char **argv) {
         ret = H5Arename_ff(gid1, "GROUP_ATTR", "RENAMED_GROUP_ATTR", tid2, e_stack);
         assert(ret == 0);
 
+        ret = H5Aclose_ff(aid11, e_stack);
+        assert(ret == 0);
+        ret = H5Aclose_ff(aid12, e_stack);
+        assert(ret == 0);
+        ret = H5Aclose_ff(aid13, e_stack);
+        assert(ret == 0);
         ret = H5Aclose_ff(aid2, e_stack);
         assert(ret == 0);
         ret = H5Aclose_ff(aid3, e_stack);
@@ -217,7 +260,7 @@ int main(int argc, char **argv) {
         assert(ret == 0);
         ret = H5Dclose_ff(did1, e_stack);
         assert(ret == 0);
-        ret = H5Mclose_ff(map, e_stack);
+        ret = H5Mclose_ff(map1, e_stack);
         assert(ret == 0);
         ret = H5Gclose_ff(gid1, e_stack);
         assert(ret == 0);
@@ -259,9 +302,13 @@ int main(int argc, char **argv) {
     assert(ret == 0);
 
     gid1 = H5Gopen_ff(file_id, "G1", H5P_DEFAULT, rid3, e_stack);
-
+    {
+        htri_t exists3;
+        ret = H5Aexists_ff(gid1, "RENAMED_GROUP_ATTR", &exists3, rid3, H5_EVENT_STACK_NULL);
+        assert(exists3 == true);
+    }
     aid2 = H5Aopen_ff(gid1, "RENAMED_GROUP_ATTR", H5P_DEFAULT, rid3, e_stack);
-    assert(aid2);
+    assert(aid2 >= 0);
     ret = H5Aread_ff(aid2, dtid, rdata2, rid3, e_stack);
     assert(ret == 0);
 
@@ -269,6 +316,12 @@ int main(int argc, char **argv) {
                               H5P_DEFAULT, rid3, e_stack);
     assert(aid5);
     ret = H5Aread_ff(aid5, stype_id, str_data, rid3, e_stack);
+    assert(ret == 0);
+
+    ret = H5Aiterate_ff(gid1, 0, H5_ITER_NATIVE, NULL, iterate_cb, NULL, rid3, H5_EVENT_STACK_NULL);
+    assert(ret == 0);
+    ret = H5Aiterate_by_name_ff(file_id, "G1", 0, H5_ITER_NATIVE, NULL, iterate_cb, NULL, 
+                                H5P_DEFAULT, rid3, H5_EVENT_STACK_NULL);
     assert(ret == 0);
 
     ret = H5Aclose_ff(aid2, e_stack);
