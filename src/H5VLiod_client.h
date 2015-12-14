@@ -578,6 +578,7 @@ H5_DLL herr_t H5VL_iod_dataset_get_index_info(void *dset, size_t *count,
         hid_t trans_id, void **req);
 H5_DLL herr_t H5VL_iod_dataset_remove_index_info(void *dset, hid_t trans_id,
         void **req);
+H5_DLL const char *H5VL_iod_get_filename(H5VL_object_t *obj);
 
 herr_t H5VL_iod_datatype_close(void *dt, hid_t dxpl_id, void **req);
 herr_t H5VL_iod_dataset_close(void *dt, hid_t dxpl_id, void **req);

@@ -38,6 +38,7 @@
 #include "H5FDcore.h"       /* Core driver */
 #include "H5FFpublic.h"
 #include "H5VLiod.h"
+#include "H5VLiod_client.h"
 
 
 /****************/
@@ -2167,8 +2168,8 @@ done:
  *-------------------------------------------------------------------------
  */
 static herr_t
-H5Q__apply_object_data_ff(hid_t loc_id, const char *name,
-    const H5O_info_t *oinfo, void *udata, hid_t rcxt_id)
+H5Q__apply_object_data_ff(hid_t oid, const char *name,
+    const H5O_ff_info_t *oinfo, void *udata, hid_t rcxt_id)
 {
     href_ff_t ref;
     H5Q_apply_arg_t *args = (H5Q_apply_arg_t *) udata;
@@ -2199,7 +2200,7 @@ H5Q__apply_object_data_ff(hid_t loc_id, const char *name,
         HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a dataset");
 
     /* Query dataset */
-    if (NULL == (space_id = H5Dquery_ff(obj_id, args->query->query_id, -1, rcxt_id)))
+    if (FAIL == (space_id = H5Dquery_ff(obj_id, args->query->query_id, -1, rcxt_id)))
         HGOTO_ERROR(H5E_DATASET, H5E_CANTSELECT, FAIL, "can't query dataset");
 
     /* No element matched the query */
