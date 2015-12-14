@@ -130,6 +130,8 @@ H5_DLL herr_t H5VLiod_query_map(hid_t obj_id, iod_trans_id_t rtid,
                                 iod_obj_map_t **obj_map);
 H5_DLL herr_t H5VLiod_close_map(hid_t obj_id, iod_obj_map_t *obj_map);
 
+H5_DLL const char *H5VL_iod_get_filename(H5VL_object_t *obj);
+
 #endif /* H5_HAVE_EFF */
 
 #ifdef __cplusplus

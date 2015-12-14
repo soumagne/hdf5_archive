@@ -37,6 +37,7 @@
 #include "H5Aprivate.h"     /* Attributes */
 #include "H5FDcore.h"       /* Core driver */
 #include "H5FFpublic.h"
+#include "H5VLiod.h"
 
 
 /****************/
@@ -254,7 +255,8 @@ static herr_t H5Q__apply_object_attr_iterate_ff(hid_t loc_id, const char *attr_n
     const H5A_info_t *ainfo,  void *udata, hid_t rcxt_id);
 static herr_t H5Q__apply_object_attr_name_ff(hid_t loc_id, const char *attr_name,
     const H5A_info_t *ainfo, void *udata, hid_t rcxt_id);
-static herr_t H5Q__apply_object_attr_value_ff(H5A_t *attr, void *udata);
+static herr_t H5Q__apply_object_attr_value_ff(hid_t loc_id, const char *attr_name,
+    const H5A_info_t *ainfo, void *udata, hid_t rcxt_id);
 static herr_t H5Q__apply_object_attr_value_iterate(void *elem, hid_t type_id,
     unsigned ndim, const hsize_t *point, void *udata);
 

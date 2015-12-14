@@ -10704,4 +10704,20 @@ done:
 
 #endif /* H5_HAVE_INDEXING */
 
+/*-------------------------------------------------------------------------
+ * Function:    H5VL_iod_get_filename
+ *
+ * Purpose: Get file name from object.
+ *
+ * Return:  Success:    string
+ *          Failure:    NULL
+ *-------------------------------------------------------------------------
+ */
+const char *
+H5VL_iod_get_filename(H5VL_object_t *obj)
+{
+    H5VL_iod_object_t *iod_obj = (H5VL_iod_object_t *) obj->vol_obj;
+    return (const char *)iod_obj->file->file_name;
+}
+
 #endif /* H5_HAVE_EFF */
