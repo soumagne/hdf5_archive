@@ -33,6 +33,8 @@ const char *FILENAME[] = {
 #define MAX_NAME 64
 #define MULTI_NFILES 3
 
+static int my_rank = 0, my_size = 1;
+
 /* Create query */
 static hid_t
 test_query_create(void)
