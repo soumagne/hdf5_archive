@@ -2168,7 +2168,7 @@ done:
  *-------------------------------------------------------------------------
  */
 static herr_t
-H5Q__apply_object_data_ff(hid_t oid, const char *name,
+H5Q__apply_object_data_ff(hid_t loc_id, const char *name,
     const H5O_ff_info_t *oinfo, void *udata, hid_t rcxt_id)
 {
     href_ff_t ref;
