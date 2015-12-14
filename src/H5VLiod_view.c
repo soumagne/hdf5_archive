@@ -505,7 +505,7 @@ H5VL__iod_apply_query(hid_t file_id, hid_t rcxt_id, hid_t qid, hid_t vcpl_id,
         else if(H5Q_TYPE_LINK_NAME == q_type) {
             hbool_t temp_result;
 
-            if(H5Qapply(qid, &temp_result, link_name) < 0)
+            if(H5Qapply_atom(qid, &temp_result, link_name) < 0)
                 HGOTO_ERROR_FF(FAIL, "can't apply link name query");
 
             if(TRUE == temp_result && H5I_ATTR == obj_type)
@@ -518,7 +518,7 @@ H5VL__iod_apply_query(hid_t file_id, hid_t rcxt_id, hid_t qid, hid_t vcpl_id,
             hbool_t temp_result;
 
             for (i=0 ; i<num_attrs ; i++) {
-                if(H5Qapply(qid, &temp_result, attr_list[i]) < 0)
+                if(H5Qapply_atom(qid, &temp_result, attr_list[i]) < 0)
                     HGOTO_ERROR_FF(FAIL, "can't apply attr name query");
                 if(TRUE == temp_result) {
                     *result = QTRUE;
@@ -526,7 +526,7 @@ H5VL__iod_apply_query(hid_t file_id, hid_t rcxt_id, hid_t qid, hid_t vcpl_id,
                 }
             }
             if(H5I_ATTR == obj_type && attr_name) {
-                if(H5Qapply(qid, &temp_result, attr_name) < 0)
+                if(H5Qapply_atom(qid, &temp_result, attr_name) < 0)
                     HGOTO_ERROR_FF(FAIL, "can't apply attr name query");
                 if(TRUE == temp_result)
                     *result = QNEUTRAL;
@@ -1025,7 +1025,7 @@ H5VL__iod_get_query_data_cb(void *elem, hid_t type_id, unsigned ndim,
     herr_t ret_value = SUCCEED;
 
     /* Apply the query */
-    if(H5Qapply_combine(udata->query_id, &result, type_id, elem) < 0)
+    if(H5Qapply_atom(udata->query_id, &result, type_id, elem) < 0)
         HGOTO_ERROR_FF(FAIL, "unable to apply query to data element");
 
     /* If element satisfies query, add it to the selection */
