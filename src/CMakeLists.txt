@@ -648,6 +648,9 @@ IF (HDF5_ENABLE_EFF)
     set (H5FF_SRCS
         ${HDF5_SRC_DIR}/H5AS.c
         ${HDF5_SRC_DIR}/H5FF.c
+        ${HDF5_SRC_DIR}/H5FF_attr.c
+        ${HDF5_SRC_DIR}/H5FF_obj.c
+        ${HDF5_SRC_DIR}/H5FF_ref.c
         ${HDF5_SRC_DIR}/H5M.c
         ${HDF5_SRC_DIR}/H5ES.c
         ${HDF5_SRC_DIR}/H5RC.c
