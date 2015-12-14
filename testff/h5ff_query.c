@@ -356,8 +356,10 @@ test_query_create_simple_file(const char *filename, hid_t fapl, unsigned idx_plu
     if ((dspace = H5Screate_simple(rank, dims, NULL)) < 0) FAIL_STACK_ERROR;
 
     /* Create some datasets and use index if told to */
+#ifdef H5_HAVE_FASTBIT
     if (idx_plugin && ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)) FAIL_STACK_ERROR;
     if (idx_plugin && (H5Pset_index_plugin(dcpl, idx_plugin)) < 0) FAIL_STACK_ERROR;
+#endif
     if ((pres1 = H5Dcreate_ff(obj1, "Pressure", H5T_NATIVE_FLOAT, dspace, H5P_DEFAULT,
             dcpl, H5P_DEFAULT, trans, estack)) < 0) FAIL_STACK_ERROR;
     if ((temp1 = H5Dcreate_ff(obj1, "Temperature", H5T_NATIVE_FLOAT, dspace, H5P_DEFAULT,
@@ -370,7 +372,9 @@ test_query_create_simple_file(const char *filename, hid_t fapl, unsigned idx_plu
             dcpl, H5P_DEFAULT, trans, estack)) < 0) FAIL_STACK_ERROR;
     if ((temp3 = H5Dcreate_ff(obj3, "Temperature", H5T_NATIVE_FLOAT, dspace, H5P_DEFAULT,
             dcpl, H5P_DEFAULT, trans, estack)) < 0) FAIL_STACK_ERROR;
+#ifdef H5_HAVE_FASTBIT
     if (idx_plugin && (H5Pclose(dcpl) < 0)) FAIL_STACK_ERROR;
+#endif
 
     /* Add attributes to datasets */
     if ((aspace = H5Screate_simple(1, adim, NULL)) < 0) FAIL_STACK_ERROR;
@@ -595,7 +599,7 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
     /* Open the file in read-only */
     if ((file = H5Fopen_ff(filename, H5F_ACC_RDONLY, fapl, &rcxt, estack)) < 0) FAIL_STACK_ERROR;
     H5RCget_version(rcxt, &version);
-    printf(stderr, "APP-r%d: Re-open %s\n", my_rank, filename);
+    printf("APP-r%d: Re-open %s\n", my_rank, filename);
 
     printf("\nRegion query\n");
     printf(  "------------\n");
@@ -807,7 +811,7 @@ main(int argc, char *argv[])
 
     TESTING("query apply view (no index)");
 
-    if (test_query_apply_view(filename, fapl, 0) < 0) FAIL_STACK_ERROR;
+    if (test_query_apply_view(filename, fapl, 0, H5_EVENT_STACK_NULL) < 0) FAIL_STACK_ERROR;
 
     PASSED();
 
