@@ -2803,7 +2803,7 @@ H5Dquery_ff(hid_t dset_id, hid_t file_space_id, hid_t query_id, hid_t rcxt_id)
      * add something to check whether the plugin supports it or not */
     query_func = (combine_op == H5Q_SINGLETON) ? H5D__query_singleton_ff : H5D__query_combined_ff;
     if (FAIL == (ret_value = query_func(dset_id, file_space_id, query_id, rcxt_id)))
-        HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, NULL, "unable to get combine operator");
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get combine operator");
 
 //    if(NULL == (dset = (H5VL_object_t *)H5I_object_verify(dset_id, H5I_DATASET)))
 //  HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a dataset");
@@ -2910,7 +2910,7 @@ H5D__query_combined_ff(hid_t dset_id, hid_t file_space_id, hid_t query_id,
     hid_t sub_selection1_id = FAIL, sub_selection2_id = FAIL;
     H5S_seloper_t seloper;
     H5Q_combine_op_t combine_op;
-    H5S_t *ret_value = NULL;
+    hid_t ret_value = FAIL;
 
     FUNC_ENTER_NOAPI_NOINIT
 
