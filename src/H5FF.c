@@ -2956,7 +2956,7 @@ static hid_t
 H5D__query_force_ff(hid_t dset_id, hid_t query_id, hid_t file_space_id, hid_t rcxt_id)
 {
     size_t n_elmts, elmt_size, buf_size;
-
+    void *buf = NULL;
     H5D_query_iter_arg_t iter_args;
     hid_t space_id = FAIL, dset_space_id = FAIL;
     hid_t type_id = FAIL;
