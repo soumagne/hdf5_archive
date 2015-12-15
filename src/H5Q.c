@@ -2840,8 +2840,8 @@ H5Q_apply_multi_ff(size_t loc_count, hid_t *loc_ids, const H5Q_t *query,
         args.result = &loc_result;
         args.view = &loc_view;
 
-        if (FAIL == H5O_visit(loc_ids[i], ".", H5_INDEX_NAME, H5_ITER_NATIVE, H5Q__apply_iterate_ff,
-                &args, H5P_LINK_ACCESS_DEFAULT, H5AC_ind_dxpl_id))
+        if (FAIL == H5Ovisit_ff(loc_ids[i], H5_INDEX_NAME, H5_ITER_NATIVE, H5Q__apply_iterate_ff,
+                &args, rcxt_ids[i], H5_EVENT_STACK_NULL))
             HGOTO_ERROR(H5E_SYM, H5E_BADITER, NULL, "object visitation failed");
 
         multi_result |= loc_result;

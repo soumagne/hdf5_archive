@@ -110,6 +110,6 @@ H5_DLL herr_t H5Q_apply_atom(const H5Q_t *query, hbool_t *result, ...);
 H5_DLL H5G_t *H5Q_apply_ff(hid_t loc_id, const H5Q_t *query, unsigned *result,
     hid_t vcpl_id, hid_t rcxt_id);
 H5_DLL H5G_t *H5Q_apply_multi_ff(size_t loc_count, hid_t *loc_ids, const H5Q_t *query,
-    unsigned *result, hid_t vcpl_id, hid_t *rcxt_ids, hid_t estack_id);
+    unsigned *result, hid_t vcpl_id, hid_t *rcxt_ids);
 
 #endif /* _H5Qprivate_H */
