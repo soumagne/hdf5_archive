@@ -2797,7 +2797,7 @@ H5Dquery_ff(hid_t dset_id, hid_t file_space_id, hid_t query_id, hid_t rcxt_id)
     H5TRACE4("i", "iiii", dset_id, query_id, scope_id, rcxt_id);
 
     if (FAIL == H5Qget_combine_op(query_id, &combine_op))
-        HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, NULL, "unable to get combine operator");
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get combine operator");
 
     /* TODO might want to fix that to give the combined query to the plugin,
      * add something to check whether the plugin supports it or not */
@@ -2880,12 +2880,12 @@ H5D__query_singleton_ff(hid_t dset_id, hid_t file_space_id, hid_t query_id, hid_
     } else {
         /* Do a brute force selection */
         if (FAIL == (ret_value = H5D__query_force_ff(dset_id, query_id, file_space_id, rcxt_id)))
-            HGOTO_ERROR(H5E_DATASET, H5E_CANTCOMPARE, NULL, "cannot compare data elements");
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTCOMPARE, FAIL, "cannot compare data elements");
     }
 
     /* Check for valid selection */
     if (H5Sselect_valid(ret_value) != TRUE)
-        HGOTO_ERROR(H5E_DATASPACE, H5E_BADRANGE, NULL, "file selection+offset not within extent");
+        HGOTO_ERROR(H5E_DATASPACE, H5E_BADRANGE, FAIL, "file selection+offset not within extent");
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -2925,17 +2925,17 @@ H5D__query_combined_ff(hid_t dset_id, hid_t file_space_id, hid_t query_id,
     H5Qget_combine_op(query_id, &combine_op);
     seloper = (combine_op == H5Q_COMBINE_AND) ? H5S_SELECT_AND : H5S_SELECT_OR;
     if (FAIL == (ret_value = H5Scombine_select(sub_selection1_id, seloper, sub_selection2_id)))
-        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTMERGE, NULL, "cannot combine sub-selections");
+        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTMERGE, FAIL, "cannot combine sub-selections");
 
 done:
     if (sub_query1_id && (FAIL == H5Qclose(sub_query1_id)))
-        HDONE_ERROR(H5E_QUERY, H5E_CANTFREE, NULL, "cannot free query");
+        HDONE_ERROR(H5E_QUERY, H5E_CANTFREE, FAIL, "cannot free query");
     if (sub_query2_id && (FAIL == H5Qclose(sub_query2_id)))
-        HDONE_ERROR(H5E_QUERY, H5E_CANTFREE, NULL, "cannot free query");
+        HDONE_ERROR(H5E_QUERY, H5E_CANTFREE, FAIL, "cannot free query");
     if (sub_selection1_id && (FAIL == H5Sclose(sub_selection1_id)))
-        HDONE_ERROR(H5E_DATASPACE, H5E_CANTFREE, NULL, "cannot free dataspace");
+        HDONE_ERROR(H5E_DATASPACE, H5E_CANTFREE, FAIL, "cannot free dataspace");
     if (sub_selection2_id && (FAIL == H5Sclose(sub_selection2_id)))
-        HDONE_ERROR(H5E_DATASPACE, H5E_CANTFREE, NULL, "cannot free dataspace");
+        HDONE_ERROR(H5E_DATASPACE, H5E_CANTFREE, FAIL, "cannot free dataspace");
 
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5D__query_combined */
@@ -2977,12 +2977,12 @@ H5D__query_force_ff(hid_t dset_id, hid_t query_id, hid_t file_space_id, hid_t rc
     if((type_id = H5Dget_type(dset_id)) < 0)
         HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't get space id from dataset");
     if (0 == (elmt_size = H5Tget_size(type_id)))
-        HGOTO_ERROR(H5E_DATATYPE, H5E_BADTYPE, NULL, "invalid size of element");
+        HGOTO_ERROR(H5E_DATATYPE, H5E_BADTYPE, FAIL, "invalid size of element");
 
     /* Allocate buffer to hold data */
     buf_size = n_elmts * elmt_size;
     if(NULL == (buf = H5MM_malloc(buf_size)))
-        HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, NULL, "can't allocate read buffer");
+        HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, FAIL, "can't allocate read buffer");
 
     FUNC_LEAVE_API_THREADSAFE;
     ret = H5Dread_ff(dset_id, type_id, H5S_ALL, space_id, H5P_DEFAULT,
@@ -2993,9 +2993,9 @@ H5D__query_force_ff(hid_t dset_id, hid_t query_id, hid_t file_space_id, hid_t rc
         HGOTO_ERROR(H5E_DATASET, H5E_READERROR, FAIL, "can't read data from dataset");
 
     if(FAIL == (selection_id = H5Scopy(space_id)))
-        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTINIT, NULL, "unable to copy dataspace")
+        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTINIT, FAIL, "unable to copy dataspace")
     if(FAIL == H5Sselect_none(selection_id))
-        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTINIT, NULL, "unable to reset selection");
+        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTINIT, FAIL, "unable to reset selection");
 
     iter_args.space_id = selection_id;
     iter_args.query_id = query_id;
@@ -3007,7 +3007,7 @@ H5D__query_force_ff(hid_t dset_id, hid_t query_id, hid_t file_space_id, hid_t rc
 
 done:
     if ((FAIL == ret_value) && (FAIL == H5Sclose(selection_id)))
-        HDONE_ERROR(H5E_DATASPACE, H5E_CANTFREE, NULL, "cannot free dataspace");
+        HDONE_ERROR(H5E_DATASPACE, H5E_CANTFREE, FAIL, "cannot free dataspace");
     if(type_id != FAIL && H5I_dec_app_ref(type_id) < 0)
         HDONE_ERROR(H5E_DATATYPE, H5E_CANTFREE, FAIL, "can't close dataspace");
     if(dset_space_id != FAIL && H5I_dec_app_ref(dset_space_id) < 0)
