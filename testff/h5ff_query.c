@@ -741,7 +741,7 @@ test_query_apply_view_multi(const char filename[MULTI_NFILES][MAX_NAME], hid_t f
     if (test_query_close(query)) FAIL_STACK_ERROR;
 
     for (i = 0; i < MULTI_NFILES; i++) {
-        if (H5Fclose(files[i]) < 0) FAIL_STACK_ERROR;
+        if (H5Fclose_ff(files[i], FALSE, estack) < 0) FAIL_STACK_ERROR;
         if (H5RCrelease(rcxts[i], estack) < 0) FAIL_STACK_ERROR;
         if (H5RCclose(rcxts[i]) < 0) FAIL_STACK_ERROR;
     }
