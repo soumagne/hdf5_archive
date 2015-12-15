@@ -219,7 +219,6 @@ typedef struct {
 } H5Q_apply_arg_t;
 
 typedef struct {
-    hid_t loc_id;
     const char *loc_name;
     H5Q_apply_arg_t *apply_args;
 } H5Q_apply_attr_arg_t;
@@ -2254,7 +2253,6 @@ H5Q__apply_object_attr_ff(hid_t loc_id, const char *name,
     HDassert(args);
 
     /* Build attribute operator info */
-    attr_args.loc_id = loc_id;
     attr_args.loc_name = name;
     attr_args.apply_args = args;
 
@@ -2407,7 +2405,7 @@ H5Q__apply_object_attr_value_ff(hid_t loc_id, const char *attr_name,
     HDassert(args);
 
     /* Open attribute */
-    if (FAIL == (attr_id = H5Aopen_ff(args->loc_id, attr_name, H5P_DEFAULT, rcxt_id, H5_EVENT_STACK_NULL)))
+    if (FAIL == (attr_id = H5Aopen_ff(loc_id, attr_name, H5P_DEFAULT, rcxt_id, H5_EVENT_STACK_NULL)))
         HGOTO_ERROR(H5E_ATTR, H5E_CANTOPENOBJ, FAIL, "can't open attribute");
 
     /* Get attribute info */
