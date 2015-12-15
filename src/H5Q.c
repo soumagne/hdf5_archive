@@ -169,7 +169,7 @@ struct {                                                                    \
 #define H5Q_VIEW_REF_NTYPES      3          /* number of reference types */
 #define H5Q_VIEW_CORE_INCREMENT  1024       /* increment for core VFD */
 
-//#define H5Q_DEBUG
+#define H5Q_DEBUG
 
 #ifdef H5Q_DEBUG
 #define H5Q_LOG_DEBUG(...) do {                                 \
@@ -2258,8 +2258,12 @@ H5Q__apply_object_attr_ff(hid_t loc_id, const char *name,
     attr_args.loc_name = name;
     attr_args.apply_args = args;
 
-    if (FAIL == (obj_id = H5Oopen_ff(loc_id, name, H5P_DEFAULT, rcxt_id)))
-        HGOTO_ERROR(H5E_DATASET, H5E_CANTOPENOBJ, FAIL, "can't open object");
+    if (0 == HDstrcmp(name, ".")) {
+        obj_id = loc_id;
+    } else {
+        if (FAIL == (obj_id = H5Oopen_ff(loc_id, name, H5P_DEFAULT, rcxt_id)))
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTOPENOBJ, FAIL, "can't open object");
+    }
 
     /* Iterate over attributes */
     if (FAIL == (ret_value = H5Aiterate_ff(obj_id, H5_INDEX_NAME, H5_ITER_NATIVE,
@@ -2267,7 +2271,7 @@ H5Q__apply_object_attr_ff(hid_t loc_id, const char *name,
         HGOTO_ERROR(H5E_ATTR, H5E_BADITER, FAIL, "error iterating over attributes");
 
 done:
-    if ((obj_id != FAIL) && (FAIL == H5Oclose_ff(obj_id, H5_EVENT_STACK_NULL)))
+    if ((obj_id != FAIL) && (obj_id != loc_id) && (FAIL == H5Oclose_ff(obj_id, H5_EVENT_STACK_NULL)))
         HDONE_ERROR(H5E_OHDR, H5E_CANTRELEASE, FAIL, "unable to close object")
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5Q__apply_object_attr */
@@ -2353,7 +2357,7 @@ H5Q__apply_object_attr_name_ff(hid_t loc_id, const char *attr_name,
 
     *(args->apply_args->result) = H5Q_REF_ATTR;
 
-    H5Q_LOG_DEBUG("Match attribute name: %s\n", (const char *) name);
+    H5Q_LOG_DEBUG("Match attribute name: %s\n", attr_name);
 
     /* Keep attribute reference */
     if (NULL == (obj = (H5VL_object_t *) H5VL_get_object(loc_id)))
@@ -2436,7 +2440,7 @@ H5Q__apply_object_attr_value_ff(hid_t loc_id, const char *attr_name,
 
     *(args->apply_args->result) = H5Q_REF_ATTR;
 
-    H5Q_LOG_DEBUG("Match value of attribute name: %s\n", (const char *) name);
+    H5Q_LOG_DEBUG("Match value of attribute name: %s\n", attr_name);
 
     /* Keep attribute reference */
     if (NULL == (obj = (H5VL_object_t *) H5VL_get_object(loc_id)))
