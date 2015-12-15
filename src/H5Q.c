@@ -2200,7 +2200,7 @@ H5Q__apply_object_data_ff(hid_t loc_id, const char *name,
         HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a dataset");
 
     /* Query dataset */
-    if (FAIL == (space_id = H5Dquery_ff(obj_id, args->query->query_id, -1, rcxt_id)))
+    if (FAIL == (space_id = H5Dquery_ff(obj_id, -1, args->query->query_id, rcxt_id)))
         HGOTO_ERROR(H5E_DATASET, H5E_CANTSELECT, FAIL, "can't query dataset");
 
     /* No element matched the query */

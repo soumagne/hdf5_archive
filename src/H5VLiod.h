@@ -124,7 +124,7 @@ H5_DLL herr_t H5Pget_dcpl_stripe_size(hid_t dcpl_id, size_t *stripe_size);
 H5_DLL hid_t H5VLiod_get_file_id(const char *filename, iod_handle_t coh, 
                                  hid_t fapl_id, hid_t *rcxt_id);
 H5_DLL herr_t H5VLiod_close_file_id(hid_t file_id);
-H5_DLL hid_t H5Dquery_ff(hid_t dset_id, hid_t query_id, hid_t scope_id, 
+H5_DLL hid_t H5Dquery_ff(hid_t dset_id, hid_t file_space_id, hid_t query_id,
                          hid_t rcxt_id);
 H5_DLL herr_t H5VLiod_query_map(hid_t obj_id, iod_trans_id_t rtid, 
                                 iod_obj_map_t **obj_map);

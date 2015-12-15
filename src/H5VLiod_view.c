@@ -463,7 +463,7 @@ H5VL__iod_apply_query(hid_t file_id, hid_t rcxt_id, hid_t qid, hid_t vcpl_id,
                 if(H5Pget_view_elmt_scope(vcpl_id, &scope_id) < 0)
                     HGOTO_ERROR_FF(FAIL, "can't retrieve vcpl region scope");
 
-                sid = H5Dquery_ff(dset_id, qid, scope_id, rcxt_id);
+                sid = H5Dquery_ff(dset_id, scope_id, qid, rcxt_id);
                 if(FAIL == sid)
                     HGOTO_ERROR_FF(FAIL, "failed to apply query on dataset region");
 
