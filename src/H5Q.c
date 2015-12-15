@@ -1955,15 +1955,15 @@ H5Q_apply_ff(hid_t loc_id, const H5Q_t *query, unsigned *result,
 done:
     /* Release the group's object header, if it was created */
     if (ret_grp) {
-//        H5O_loc_t *grp_oloc;         /* Object location for group */
-//
-//        /* Get the new group's object location */
-//        if (NULL == (grp_oloc = H5G_oloc(ret_grp)))
-//            HDONE_ERROR(H5E_SYM, H5E_CANTGET, NULL, "unable to get object location of group");
-//
-//        /* Decrement refcount on group's object header in memory */
-//        if (FAIL == H5O_dec_rc_by_loc(grp_oloc, H5AC_dxpl_id))
-//            HDONE_ERROR(H5E_SYM, H5E_CANTDEC, NULL, "unable to decrement refcount on newly created object");
+        H5O_loc_t *grp_oloc;         /* Object location for group */
+
+        /* Get the new group's object location */
+        if (NULL == (grp_oloc = H5G_oloc(ret_grp)))
+            HDONE_ERROR(H5E_SYM, H5E_CANTGET, NULL, "unable to get object location of group");
+
+        /* Decrement refcount on group's object header in memory */
+        if (FAIL == H5O_dec_rc_by_loc(grp_oloc, H5AC_dxpl_id))
+            HDONE_ERROR(H5E_SYM, H5E_CANTDEC, NULL, "unable to decrement refcount on newly created object");
     } /* end if */
 
     /* Cleanup on failure */
@@ -2471,7 +2471,7 @@ done:
  */
 static herr_t
 H5Q__apply_object_attr_value_iterate(void *elem, hid_t type_id,
-        unsigned H5_ATTR_UNUSED ndim, const hsize_t H5_ATTR_UNUSED *point, void *udata)
+    unsigned H5_ATTR_UNUSED ndim, const hsize_t H5_ATTR_UNUSED *point, void *udata)
 {
     H5Q_apply_attr_elem_arg_t *args = (H5Q_apply_attr_elem_arg_t *) udata;
     hbool_t result;
@@ -2551,7 +2551,7 @@ done:
  */
 static herr_t
 H5Q__view_combine(H5Q_combine_op_t combine_op, H5Q_view_t *view1, H5Q_view_t *view2,
-        unsigned result1, unsigned result2, H5Q_view_t *view, unsigned *result)
+    unsigned result1, unsigned result2, H5Q_view_t *view, unsigned *result)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -2738,127 +2738,126 @@ H5Q__view_free(H5Q_view_t *view)
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5Q__view_free */
 
-///*-------------------------------------------------------------------------
-// * Function:    H5Qapply_multi
-// *
-// * Purpose: Apply a query on multiple locations and return the result.
-// * Parameters, which the query applies to, are determined by the type of the
-// * query.
-// *
-// * Return:  Non-negative on success/Negative on failure
-// *
-// *-------------------------------------------------------------------------
-// */
-//hid_t
-//H5Qapply_multi(size_t loc_count, hid_t *loc_ids, hid_t query_id,
-//        unsigned *result, hid_t vcpl_id)
-//{
-//    H5Q_t *query = NULL;
-//    H5G_loc_t *locs = NULL;
-//    H5G_t *ret_grp;
-//    hid_t ret_value;
-//    int i;
-//
-//    FUNC_ENTER_API(FAIL)
-//
-//    /* Check args and get the query objects */
-//    if (!loc_count)
-//        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "loc_count cannot be NULL");
-//    if (NULL == (locs = (H5G_loc_t *) H5MM_malloc(loc_count * sizeof(H5G_loc_t))))
-//        HGOTO_ERROR(H5E_QUERY, H5E_CANTALLOC, FAIL, "can't allocate locs buffer");
-//    for (i = 0; i < loc_count; i++) {
-//        if (FAIL == H5G_loc(loc_ids[i], &locs[i]))
-//            HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a location");
-//    }
-//    if (NULL == (query = (H5Q_t *) H5I_object_verify(query_id, H5I_QUERY)))
-//        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a query ID");
-//    if (!result)
-//        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL pointer for result");
-//
-//    /* Get the default view creation property list if the user didn't provide one */
-//    /* TODO fix that */
+/*-------------------------------------------------------------------------
+ * Function:    H5Qapply_multi
+ *
+ * Purpose: Apply a query on multiple locations and return the result.
+ * Parameters, which the query applies to, are determined by the type of the
+ * query.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+hid_t
+H5Qapply_multi_ff(size_t loc_count, hid_t *loc_ids, hid_t query_id,
+    unsigned *result, hid_t vcpl_id, hid_t *rcxt_ids, hid_t estack_id)
+{
+    H5Q_t *query = NULL;
+    H5G_t *ret_grp;
+    hid_t ret_value;
+    int i;
+
+    FUNC_ENTER_API(FAIL)
+
+    /* Check args and get the query objects */
+    if (!loc_count)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "loc_count cannot be NULL");
+    if (!loc_ids)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "loc_ids cannot be NULL");
+    if (NULL == (query = (H5Q_t *) H5I_object_verify(query_id, H5I_QUERY)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a query ID");
+    if (!result)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL pointer for result");
+    if (!rcxt_ids)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "rcxt_ids cannot be NULL");
+    if(estack_id != H5_EVENT_STACK_NULL)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "Event stack not supported for now");
+
+    /* Get the default view creation property list if the user didn't provide one */
+    /* TODO fix that */
 //    if (H5P_DEFAULT == vcpl_id)
 //        vcpl_id = H5P_INDEX_ACCESS_DEFAULT;
 //    else
 //        if (TRUE != H5P_isa_class(vcpl_id, H5P_INDEX_ACCESS))
 //            HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not index access parms");
-//
-//    /* Apply query */
-//    if (NULL == (ret_grp = H5Q_apply_multi(loc_count, locs, loc_ids, query, result, vcpl_id)))
-//        HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
-//
-//    if (FAIL == (ret_value = H5I_register(H5I_GROUP, ret_grp, TRUE)))
-//        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register group");
-//
-//done:
-//    H5MM_free(locs);
-//    FUNC_LEAVE_API(ret_value)
-//} /* end H5Qapply_multi() */
-//
-///*-------------------------------------------------------------------------
-// * Function:    H5Q_apply_multi
-// *
-// * Purpose: Private function for H5Qapply_multi.
-// *
-// * Return:  Non-negative on success/Negative on failure
-// *
-// *-------------------------------------------------------------------------
-// */
-//H5G_t *
-//H5Q_apply_multi(size_t loc_count, const H5G_loc_t *locs, hid_t *loc_ids,
-//        const H5Q_t *query, unsigned *result, hid_t H5_ATTR_UNUSED vcpl_id)
-//{
-//    H5Q_view_t view = H5Q_VIEW_INITIALIZER(view); /* Resulting view */
-//    H5Q_ref_head_t *refs[H5Q_VIEW_REF_NTYPES] = { &view.reg_refs, &view.obj_refs, &view.attr_refs };
-//    unsigned multi_result = 0;
-//    H5G_t *ret_grp = NULL; /* New group created */
-//    H5G_t *ret_value = NULL; /* Return value */
-//    H5P_genclass_t *pclass = NULL;
-//    unsigned flags;
-//    hid_t fapl_id = FAIL;
-//    H5F_t *new_file = NULL;
-//    H5G_loc_t file_loc;
-//    size_t i;
-//
-//    FUNC_ENTER_NOAPI_NOINIT
-//
-//    HDassert(loc_count);
-//    HDassert(locs);
-//    HDassert(loc_ids);
-//    HDassert(query);
-//    HDassert(result);
-//
-//    /* TODO Serial iteration for now */
-//    for (i = 0; i < loc_count; i++) {
-//        H5Q_view_t loc_view = H5Q_VIEW_INITIALIZER(loc_view); /* Resulting view */
-//        H5Q_ref_head_t *loc_refs[H5Q_VIEW_REF_NTYPES] = { &loc_view.reg_refs, &loc_view.obj_refs, &loc_view.attr_refs };
-//        unsigned loc_result;
-//        H5Q_apply_arg_t args;
-//        int j;
-//
-//        /* Create new view and init args */
-//        args.query = query;
-//        args.result = &loc_result;
-//        args.view = &loc_view;
-//
-//        if (FAIL == H5O_visit(loc_ids[i], ".", H5_INDEX_NAME, H5_ITER_NATIVE, H5Q__apply_iterate,
-//                &args, H5P_LINK_ACCESS_DEFAULT, H5AC_ind_dxpl_id))
-//            HGOTO_ERROR(H5E_SYM, H5E_BADITER, NULL, "object visitation failed");
-//
-//        multi_result |= loc_result;
-//        /* Simply concatenate results from sub-view */
-//        for (j = 0; j < H5Q_VIEW_REF_NTYPES; j++) {
-//            H5Q_QUEUE_CONCAT(refs[j], loc_refs[j]);
-//        }
-//    }
-//
-//    if (!H5Q_QUEUE_EMPTY(&view.reg_refs))
-//        H5Q_LOG_DEBUG("Number of reg refs: %zu\n", view.reg_refs.n_elem);
-//    if (!H5Q_QUEUE_EMPTY(&view.obj_refs))
-//        H5Q_LOG_DEBUG("Number of obj refs: %zu\n", view.obj_refs.n_elem);
-//    if (!H5Q_QUEUE_EMPTY(&view.attr_refs))
-//        H5Q_LOG_DEBUG("Number of attr refs: %zu\n", view.attr_refs.n_elem);
-//
+
+    /* Apply query */
+    if (NULL == (ret_grp = H5Q_apply_multi_ff(loc_count, loc_ids, query, result,
+            vcpl_id, rcxt_ids)))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
+
+    if (FAIL == (ret_value = H5I_register(H5I_GROUP, ret_grp, TRUE)))
+        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register group");
+
+done:
+    FUNC_LEAVE_API(ret_value)
+} /* end H5Qapply_multi() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5Q_apply_multi
+ *
+ * Purpose: Private function for H5Qapply_multi.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+H5G_t *
+H5Q_apply_multi_ff(size_t loc_count, hid_t *loc_ids, const H5Q_t *query,
+    unsigned *result, hid_t H5_ATTR_UNUSED vcpl_id, hid_t *rcxt_ids)
+{
+    H5Q_view_t view = H5Q_VIEW_INITIALIZER(view); /* Resulting view */
+    H5Q_ref_head_t *refs[H5Q_VIEW_REF_NTYPES] = { &view.reg_refs, &view.obj_refs, &view.attr_refs };
+    unsigned multi_result = 0;
+    H5G_t *ret_grp = NULL; /* New group created */
+    H5G_t *ret_value = NULL; /* Return value */
+    H5P_genclass_t *pclass = NULL;
+    unsigned flags;
+    hid_t fapl_id = FAIL;
+    H5F_t *new_file = NULL;
+    H5G_loc_t file_loc;
+    size_t i;
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(loc_count);
+    HDassert(loc_ids);
+    HDassert(query);
+    HDassert(result);
+    HDassert(rcxt_ids);
+
+    /* TODO Serial iteration for now */
+    for (i = 0; i < loc_count; i++) {
+        H5Q_view_t loc_view = H5Q_VIEW_INITIALIZER(loc_view); /* Resulting view */
+        H5Q_ref_head_t *loc_refs[H5Q_VIEW_REF_NTYPES] = { &loc_view.reg_refs, &loc_view.obj_refs, &loc_view.attr_refs };
+        unsigned loc_result;
+        H5Q_apply_arg_t args;
+        int j;
+
+        /* Create new view and init args */
+        args.query = query;
+        args.result = &loc_result;
+        args.view = &loc_view;
+
+        if (FAIL == H5O_visit(loc_ids[i], ".", H5_INDEX_NAME, H5_ITER_NATIVE, H5Q__apply_iterate_ff,
+                &args, H5P_LINK_ACCESS_DEFAULT, H5AC_ind_dxpl_id))
+            HGOTO_ERROR(H5E_SYM, H5E_BADITER, NULL, "object visitation failed");
+
+        multi_result |= loc_result;
+        /* Simply concatenate results from sub-view */
+        for (j = 0; j < H5Q_VIEW_REF_NTYPES; j++) {
+            H5Q_QUEUE_CONCAT(refs[j], loc_refs[j]);
+        }
+    }
+
+    if (!H5Q_QUEUE_EMPTY(&view.reg_refs))
+        H5Q_LOG_DEBUG("Number of reg refs: %zu\n", view.reg_refs.n_elem);
+    if (!H5Q_QUEUE_EMPTY(&view.obj_refs))
+        H5Q_LOG_DEBUG("Number of obj refs: %zu\n", view.obj_refs.n_elem);
+    if (!H5Q_QUEUE_EMPTY(&view.attr_refs))
+        H5Q_LOG_DEBUG("Number of attr refs: %zu\n", view.attr_refs.n_elem);
+
 //    /* Get property list class */
 //    if (NULL == (pclass = (H5P_genclass_t *)H5I_object_verify(H5P_FILE_ACCESS, H5I_GENPROP_CLS)))
 //        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a property list class");
@@ -2887,39 +2886,39 @@ H5Q__view_free(H5Q_view_t *view)
 //    /* Write view */
 //    if (FAIL == H5Q__view_write(ret_grp, &view))
 //        HGOTO_ERROR(H5E_QUERY, H5E_WRITEERROR, NULL, "can't write view");
-//
-//    *result = multi_result;
-//    ret_value = ret_grp;
-//
-//done:
-//    /* Release the group's object header, if it was created */
-//    if (ret_grp) {
-//        H5O_loc_t *grp_oloc;         /* Object location for group */
-//
-//        /* Get the new group's object location */
-//        if (NULL == (grp_oloc = H5G_oloc(ret_grp)))
-//            HDONE_ERROR(H5E_SYM, H5E_CANTGET, NULL, "unable to get object location of group");
-//
-//        /* Decrement refcount on group's object header in memory */
-//        if (FAIL == H5O_dec_rc_by_loc(grp_oloc, H5AC_dxpl_id))
-//            HDONE_ERROR(H5E_SYM, H5E_CANTDEC, NULL, "unable to decrement refcount on newly created object");
-//    } /* end if */
-//
-//    /* Cleanup on failure */
-//    if (NULL == ret_value)
-//        if (ret_grp && (FAIL == H5G_close(ret_grp)))
-//            HDONE_ERROR(H5E_SYM, H5E_CLOSEERROR, NULL, "unable to release group");
-//
-//    /* Close the property list */
-//    if ((fapl_id != FAIL) && (H5I_dec_app_ref(fapl_id) < 0))
-//        HDONE_ERROR(H5E_PLIST, H5E_CANTFREE, NULL, "can't close");
-//
-//    /* Attempt to close the file/mount hierarchy */
-//    if (new_file && (FAIL == H5F_try_close(new_file)))
-//        HDONE_ERROR(H5E_FILE, H5E_CANTCLOSEFILE, NULL, "can't close file")
-//
-//    /* Free the view */
-//    H5Q__view_free(&view);
-//
-//    FUNC_LEAVE_NOAPI(ret_value)
-//} /* end H5Q_apply_multi() */
+
+    *result = multi_result;
+    ret_value = ret_grp;
+
+done:
+    /* Release the group's object header, if it was created */
+    if (ret_grp) {
+        H5O_loc_t *grp_oloc;         /* Object location for group */
+
+        /* Get the new group's object location */
+        if (NULL == (grp_oloc = H5G_oloc(ret_grp)))
+            HDONE_ERROR(H5E_SYM, H5E_CANTGET, NULL, "unable to get object location of group");
+
+        /* Decrement refcount on group's object header in memory */
+        if (FAIL == H5O_dec_rc_by_loc(grp_oloc, H5AC_dxpl_id))
+            HDONE_ERROR(H5E_SYM, H5E_CANTDEC, NULL, "unable to decrement refcount on newly created object");
+    } /* end if */
+
+    /* Cleanup on failure */
+    if (NULL == ret_value)
+        if (ret_grp && (FAIL == H5G_close(ret_grp)))
+            HDONE_ERROR(H5E_SYM, H5E_CLOSEERROR, NULL, "unable to release group");
+
+    /* Close the property list */
+    if ((fapl_id != FAIL) && (H5I_dec_app_ref(fapl_id) < 0))
+        HDONE_ERROR(H5E_PLIST, H5E_CANTFREE, NULL, "can't close");
+
+    /* Attempt to close the file/mount hierarchy */
+    if (new_file && (FAIL == H5F_try_close(new_file)))
+        HDONE_ERROR(H5E_FILE, H5E_CANTCLOSEFILE, NULL, "can't close file")
+
+    /* Free the view */
+    H5Q__view_free(&view);
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5Q_apply_multi() */

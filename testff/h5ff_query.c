@@ -599,7 +599,7 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
     /* Open the file in read-only */
     if ((file = H5Fopen_ff(filename, H5F_ACC_RDONLY, fapl, &rcxt, estack)) < 0) FAIL_STACK_ERROR;
     H5RCget_version(rcxt, &version);
-    printf("APP-r%d: Re-open %s\n", my_rank, filename);
+    printf("Re-open %s version %d\n", filename, version);
 
     printf("\nRegion query\n");
     printf(  "------------\n");
@@ -609,7 +609,7 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
 
     HDgettimeofday(&t1, NULL);
 
-    H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack);;
+    H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack);
 //    if ((view = H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack)) < 0) FAIL_STACK_ERROR;
 
     HDgettimeofday(&t2, NULL);
@@ -622,40 +622,41 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
 //    if (test_query_read_selection(file, fapl, view, H5R_DATASET_REGION) < 0) FAIL_STACK_ERROR;
 
 //    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
-//    if (test_query_close(query)) FAIL_STACK_ERROR;
-//
-//    printf("\nObject query\n");
-//    printf(  "------------\n");
-//
-//    /* Test object query */
-//    if ((query = test_query_create_type(H5R_OBJECT)) < 0) FAIL_STACK_ERROR;
+    if (test_query_close(query)) FAIL_STACK_ERROR;
+
+    printf("\nObject query\n");
+    printf(  "------------\n");
+
+    /* Test object query */
+    if ((query = test_query_create_type(H5R_OBJECT)) < 0) FAIL_STACK_ERROR;
+    H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack);
 //    if ((view = H5Qapply(file, query, &result, H5P_DEFAULT)) < 0) FAIL_STACK_ERROR;
-//
-//    if (!(result & H5Q_REF_OBJ)) FAIL_STACK_ERROR;
+
+    if (!(result & H5Q_REF_OBJ)) FAIL_STACK_ERROR;
 //    if (test_query_read_selection(file, fapl, view, H5R_OBJECT) < 0) FAIL_STACK_ERROR;
-//
+
 //    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
-//    if (test_query_close(query)) FAIL_STACK_ERROR;
-//
-//    printf("\nAttribute query\n");
-//    printf(  "---------------\n");
-//
-//    /* Test attribute query */
-//    if ((query = test_query_create_type(H5R_ATTR)) < 0) FAIL_STACK_ERROR;
+    if (test_query_close(query)) FAIL_STACK_ERROR;
+
+    printf("\nAttribute query\n");
+    printf(  "---------------\n");
+
+    /* Test attribute query */
+    if ((query = test_query_create_type(H5R_ATTR)) < 0) FAIL_STACK_ERROR;
+    H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack);
 //    if ((view = H5Qapply(file, query, &result, H5P_DEFAULT)) < 0) FAIL_STACK_ERROR;
-//
-//    if (!(result & H5Q_REF_ATTR)) FAIL_STACK_ERROR;
+
+    if (!(result & H5Q_REF_ATTR)) FAIL_STACK_ERROR;
 //    if (test_query_read_selection(file, fapl, view, H5R_ATTR) < 0) FAIL_STACK_ERROR;
-//
+
 //    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
-//    if (test_query_close(query)) FAIL_STACK_ERROR;
+    if (test_query_close(query)) FAIL_STACK_ERROR;
 
     /* Release the read handle and close read context  */
     if (H5RCrelease(rcxt, estack) < 0) FAIL_STACK_ERROR;
     if (H5RCclose(rcxt) < 0) FAIL_STACK_ERROR;
 
     if (H5Fclose_ff(file, FALSE, estack) < 0) FAIL_STACK_ERROR;
-    if (test_query_close(query)) FAIL_STACK_ERROR;
 
     printf("---\n...");
 
@@ -665,91 +666,94 @@ error:
     return -1;
 }
 
-//static herr_t
-//test_query_apply_view_multi(const char filename[MULTI_NFILES][MAX_NAME], hid_t fapl, unsigned idx_plugin)
-//{
-//    hid_t files[MULTI_NFILES] = {H5I_BADID, H5I_BADID, H5I_BADID};
-//    hid_t view = H5I_BADID;
-//    hid_t query = H5I_BADID;
-//    struct timeval t1, t2;
-//    unsigned result = 0;
-//    int i;
-//
-//    printf(" ...\n---\n");
-//
-//    /* Create simple files for testing queries */
-//    for (i = 0; i < MULTI_NFILES; i++) {
-//        printf("Creating test file \"%s\"\n", filename[i]);
-//        if ((test_query_create_simple_file(filename[i], fapl, idx_plugin)) < 0) FAIL_STACK_ERROR;
-//        /* Open the file in read-only */
-//        if ((files[i] = H5Fopen(filename[i], H5F_ACC_RDONLY, fapl)) < 0) FAIL_STACK_ERROR;
-//    }
-//
-//    printf("\nRegion query\n");
-//    printf(  "------------\n");
-//
-//    /* Test region query */
-//    if ((query = test_query_create_type(H5R_REGION)) < 0) FAIL_STACK_ERROR;
-//
-//    HDgettimeofday(&t1, NULL);
-//
-//    if ((view = H5Qapply_multi(MULTI_NFILES, files, query, &result, H5P_DEFAULT)) < 0) FAIL_STACK_ERROR;
-//
-//    HDgettimeofday(&t2, NULL);
-//
-//    printf("View creation time on region: %lf ms\n",
-//            ((float) (t2.tv_sec - t1.tv_sec)) * 1000.0f
-//            + ((float) (t2.tv_usec - t1.tv_usec)) / 1000.0f);
-//
-//    if (!(result & H5Q_REF_REG)) FAIL_STACK_ERROR;
+static herr_t
+test_query_apply_view_multi(const char filename[MULTI_NFILES][MAX_NAME], hid_t fapl,
+    unsigned idx_plugin, hid_t estack)
+{
+    hid_t files[MULTI_NFILES] = {H5I_BADID, H5I_BADID, H5I_BADID};
+    hid_t rcxts[MULTI_NFILES] = {H5I_BADID, H5I_BADID, H5I_BADID};
+    hid_t view = H5I_BADID;
+    hid_t query = H5I_BADID;
+    struct timeval t1, t2;
+    unsigned result = 0;
+    int i;
+
+    printf(" ...\n---\n");
+
+    /* Create simple files for testing queries */
+    for (i = 0; i < MULTI_NFILES; i++) {
+        uint64_t req_version = 1;
+        printf("Creating test file \"%s\"\n", filename[i]);
+        if ((test_query_create_simple_file(filename[i], fapl, idx_plugin, req_version, estack)) < 0) FAIL_STACK_ERROR;
+        /* Open the file in read-only */
+        if ((files[i] = H5Fopen_ff(filename[i], H5F_ACC_RDONLY, fapl, &rcxts[i], estack)) < 0) FAIL_STACK_ERROR;
+    }
+
+    printf("\nRegion query\n");
+    printf(  "------------\n");
+
+    /* Test region query */
+    if ((query = test_query_create_type(H5R_DATASET_REGION)) < 0) FAIL_STACK_ERROR;
+
+    HDgettimeofday(&t1, NULL);
+
+    H5Qapply_multi_ff(MULTI_NFILES, files, query, &result, H5P_DEFAULT, rcxts, estack);
+//    if ((view = H5Qapply_multi_ff(MULTI_NFILES, files, query, &result, H5P_DEFAULT, rcxts, estack)) < 0) FAIL_STACK_ERROR;
+
+    HDgettimeofday(&t2, NULL);
+
+    printf("View creation time on region: %lf ms\n",
+            ((float) (t2.tv_sec - t1.tv_sec)) * 1000.0f
+            + ((float) (t2.tv_usec - t1.tv_usec)) / 1000.0f);
+
+    if (!(result & H5Q_REF_REG)) FAIL_STACK_ERROR;
 //    if (test_query_read_selection(H5I_BADID, fapl, view, H5R_REGION) < 0) FAIL_STACK_ERROR;
-//
+
 //    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
-//    if (test_query_close(query)) FAIL_STACK_ERROR;
-//
-//    printf("\nObject query\n");
-//    printf(  "------------\n");
-//
-//    /* Test object query */
-//    if ((query = test_query_create_type(H5R_OBJECT)) < 0) FAIL_STACK_ERROR;
+    if (test_query_close(query)) FAIL_STACK_ERROR;
+
+    printf("\nObject query\n");
+    printf(  "------------\n");
+
+    /* Test object query */
+    if ((query = test_query_create_type(H5R_OBJECT)) < 0) FAIL_STACK_ERROR;
+    H5Qapply_multi_ff(MULTI_NFILES, files, query, &result, H5P_DEFAULT, rcxts, estack);
 //    if ((view = H5Qapply_multi(MULTI_NFILES, files, query, &result, H5P_DEFAULT)) < 0) FAIL_STACK_ERROR;
-//
-//    if (!(result & H5Q_REF_OBJ)) FAIL_STACK_ERROR;
+
+    if (!(result & H5Q_REF_OBJ)) FAIL_STACK_ERROR;
 //    if (test_query_read_selection(H5I_BADID, fapl, view, H5R_OBJECT) < 0) FAIL_STACK_ERROR;
-//
+
 //    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
-//    if (test_query_close(query)) FAIL_STACK_ERROR;
-//
-//    printf("\nAttribute query\n");
-//    printf(  "---------------\n");
-//
-//    /* Test attribute query */
-//    if ((query = test_query_create_type(H5R_ATTR)) < 0) FAIL_STACK_ERROR;
+    if (test_query_close(query)) FAIL_STACK_ERROR;
+
+    printf("\nAttribute query\n");
+    printf(  "---------------\n");
+
+    /* Test attribute query */
+    if ((query = test_query_create_type(H5R_ATTR)) < 0) FAIL_STACK_ERROR;
+    H5Qapply_multi_ff(MULTI_NFILES, files, query, &result, H5P_DEFAULT, rcxts, estack);
 //    if ((view = H5Qapply_multi(MULTI_NFILES, files, query, &result, H5P_DEFAULT)) < 0) FAIL_STACK_ERROR;
-//
-//    if (!(result & H5Q_REF_ATTR)) FAIL_STACK_ERROR;
+
+    if (!(result & H5Q_REF_ATTR)) FAIL_STACK_ERROR;
 //    if (test_query_read_selection(H5I_BADID, fapl, view, H5R_ATTR) < 0) FAIL_STACK_ERROR;
-//
+
 //    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
-//    if (test_query_close(query)) FAIL_STACK_ERROR;
-//
-//    for (i = 0; i < MULTI_NFILES; i++)
-//        if (H5Fclose(files[i]) < 0) FAIL_STACK_ERROR;
-//    if (test_query_close(query)) FAIL_STACK_ERROR;
-//
-//    printf("---\n...");
-//
-//    return 0;
-//
-//error:
-//    H5E_BEGIN_TRY {
-//        H5Gclose(view);
-//        for (i = 0; i < MULTI_NFILES; i++)
-//            H5Fclose(files[i]);
-//        test_query_close(query);
-//    } H5E_END_TRY;
-//    return -1;
-//}
+    if (test_query_close(query)) FAIL_STACK_ERROR;
+
+    for (i = 0; i < MULTI_NFILES; i++) {
+        if (H5Fclose(files[i]) < 0) FAIL_STACK_ERROR;
+        if (H5RCrelease(rcxts[i], estack) < 0) FAIL_STACK_ERROR;
+        if (H5RCclose(rcxts[i]) < 0) FAIL_STACK_ERROR;
+    }
+    if (test_query_close(query)) FAIL_STACK_ERROR;
+
+    printf("---\n...");
+
+    return 0;
+
+error:
+    return -1;
+}
 
 int
 main(int argc, char *argv[])
@@ -823,17 +827,19 @@ main(int argc, char *argv[])
     PASSED();
 #endif
 
-//    TESTING("query apply view multiple (no index)");
-//
-//    if (test_query_apply_view_multi(filename_multi, fapl, H5X_PLUGIN_NONE) < 0) FAIL_STACK_ERROR;
-//
-//    PASSED();
+    TESTING("query apply view multiple (no index)");
+
+    if (test_query_apply_view_multi(filename_multi, fapl, 0, H5_EVENT_STACK_NULL) < 0) FAIL_STACK_ERROR;
+
+    PASSED();
 
     /* Verify symbol table messages are cached */
-    if(h5_verify_cached_stabs(FILENAME, fapl) < 0) TEST_ERROR
+//    if(h5_verify_cached_stabs(FILENAME, fapl) < 0) TEST_ERROR
 
     puts("All query tests passed.");
     h5_cleanup(FILENAME, fapl);
+    EFF_finalize();
+    MPI_Finalize();
 
     return 0;
 
