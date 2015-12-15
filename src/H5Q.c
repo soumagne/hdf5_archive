@@ -2222,7 +2222,7 @@ H5Q__apply_object_data_ff(hid_t loc_id, const char *name,
 
 done:
     if (space_id != FAIL) H5Sclose(space_id);
-    if ((obj_id != FAIL) && (FAIL == H5I_dec_app_ref(obj_id)))
+    if ((obj_id != FAIL) && (FAIL == H5Oclose_ff(obj_id, H5_EVENT_STACK_NULL)))
         HDONE_ERROR(H5E_OHDR, H5E_CANTRELEASE, FAIL, "unable to close object")
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5Q__apply_object_data */
@@ -2267,7 +2267,7 @@ H5Q__apply_object_attr_ff(hid_t loc_id, const char *name,
         HGOTO_ERROR(H5E_ATTR, H5E_BADITER, FAIL, "error iterating over attributes");
 
 done:
-    if ((obj_id != FAIL) && (FAIL == H5I_dec_app_ref(obj_id)))
+    if ((obj_id != FAIL) && (FAIL == H5Oclose_ff(obj_id, H5_EVENT_STACK_NULL)))
         HDONE_ERROR(H5E_OHDR, H5E_CANTRELEASE, FAIL, "unable to close object")
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5Q__apply_object_attr */
