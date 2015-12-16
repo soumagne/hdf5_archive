@@ -1962,7 +1962,7 @@ H5Q_apply_ff(hid_t loc_id, const H5Q_t *query, unsigned *result,
         HGOTO_ERROR(H5E_SYM, H5E_BADVALUE, NULL, "unable to create location for file")
 
     /* Create the new group & get its ID */
-    if (NULL == (ret_grp = H5Gcreate_anon(&file_loc, H5P_GROUP_CREATE_DEFAULT, H5P_GROUP_ACCESS_DEFAULT)))
+    if (NULL == (ret_grp = H5G_create_anon(&file_loc, H5P_GROUP_CREATE_DEFAULT, H5P_GROUP_ACCESS_DEFAULT)))
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, NULL, "unable to create group");
 
     /* Write view */
