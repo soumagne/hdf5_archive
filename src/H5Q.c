@@ -1871,13 +1871,9 @@ H5Qapply_ff(hid_t loc_id, hid_t query_id, unsigned *result, hid_t vcpl_id,
     if (NULL == (ret_grp = H5Q_apply_ff(loc_id, query, result, vcpl_id, rcxt_id)))
         HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
 
-//    if (FAIL == (ret_value = H5I_register(H5I_GROUP, ret_grp, TRUE)))
-//        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register group");
-
+    /* Setup VOL info */
     if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(native_vol, H5I_VOL)))
         HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a VOL plugin ID")
-
-    /* setup VOL info struct */
     if(NULL == (vol_info = H5FL_CALLOC(H5VL_t)))
         HGOTO_ERROR(H5E_FILE, H5E_NOSPACE, FAIL, "can't allocate VL info struct")
     vol_info->vol_cls = vol_cls;
@@ -2775,6 +2771,9 @@ H5Qapply_multi_ff(size_t loc_count, hid_t *loc_ids, hid_t query_id,
     H5Q_t *query = NULL;
     H5G_t *ret_grp;
     hid_t ret_value;
+    hid_t native_vol = H5VL_NATIVE;
+    H5VL_class_t *vol_cls = NULL; /* VOL Class structure for callback info */
+    H5VL_t *vol_info = NULL;      /* VOL info struct */
     int i;
 
     FUNC_ENTER_API(FAIL)
@@ -2806,8 +2805,19 @@ H5Qapply_multi_ff(size_t loc_count, hid_t *loc_ids, hid_t query_id,
             vcpl_id, rcxt_ids)))
         HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
 
-    if (FAIL == (ret_value = H5I_register(H5I_GROUP, ret_grp, TRUE)))
-        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register group");
+    /* Setup VOL info */
+    if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(native_vol, H5I_VOL)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a VOL plugin ID")
+    if(NULL == (vol_info = H5FL_CALLOC(H5VL_t)))
+        HGOTO_ERROR(H5E_FILE, H5E_NOSPACE, FAIL, "can't allocate VL info struct")
+    vol_info->vol_cls = vol_cls;
+    vol_info->vol_id = native_vol;
+    if(H5I_inc_ref(vol_info->vol_id, FALSE) < 0)
+        HGOTO_ERROR(H5E_ATOM, H5E_CANTINC, FAIL, "unable to increment ref count on VOL plugin")
+
+    /* Get an atom for the group */
+    if((ret_value = H5VL_register_id(H5I_GROUP, (void *)ret_grp, vol_info, TRUE)) < 0)
+        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to atomize group handle")
 
 done:
     FUNC_LEAVE_API(ret_value)
@@ -2877,34 +2887,34 @@ H5Q_apply_multi_ff(size_t loc_count, hid_t *loc_ids, const H5Q_t *query,
     if (!H5Q_QUEUE_EMPTY(&view.attr_refs))
         H5Q_LOG_DEBUG("Number of attr refs: %zu\n", view.attr_refs.n_elem);
 
-//    /* Get property list class */
-//    if (NULL == (pclass = (H5P_genclass_t *)H5I_object_verify(H5P_FILE_ACCESS, H5I_GENPROP_CLS)))
-//        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a property list class");
-//
-//    /* Create the new property list */
-//    if (FAIL == (fapl_id = H5P_create_id(pclass, TRUE)))
-//        HGOTO_ERROR(H5E_PLIST, H5E_CANTCREATE, NULL, "unable to create property list");
-//
-//    /* Use the core VFD to store the view */
-//    if (FAIL == H5Pset_fapl_core(fapl_id, H5Q_VIEW_CORE_INCREMENT, FALSE))
-//        HGOTO_ERROR(H5E_PLIST, H5E_CANTSET, NULL, "unable to set property list to core VFD");
-//
-//    /* Create a new file or truncate an existing file. */
-//    flags = H5F_ACC_EXCL | H5F_ACC_RDWR | H5F_ACC_CREAT;
-//    if (NULL == (new_file = H5F_open("view", flags, H5P_FILE_CREATE_DEFAULT, fapl_id, H5AC_dxpl_id)))
-//        HGOTO_ERROR(H5E_FILE, H5E_CANTOPENFILE, NULL, "unable to create file");
-//
-//    /* Construct a group location for root group of the file */
-//    if (FAIL == H5G_root_loc(new_file, &file_loc))
-//        HGOTO_ERROR(H5E_SYM, H5E_BADVALUE, NULL, "unable to create location for file")
-//
-//    /* Create the new group & get its ID */
-//    if (NULL == (ret_grp = H5G_create_anon(&file_loc, H5P_GROUP_CREATE_DEFAULT, H5P_GROUP_ACCESS_DEFAULT)))
-//        HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, NULL, "unable to create group");
-//
-//    /* Write view */
-//    if (FAIL == H5Q__view_write(ret_grp, &view))
-//        HGOTO_ERROR(H5E_QUERY, H5E_WRITEERROR, NULL, "can't write view");
+    /* Get property list class */
+    if (NULL == (pclass = (H5P_genclass_t *)H5I_object_verify(H5P_FILE_ACCESS, H5I_GENPROP_CLS)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a property list class");
+
+    /* Create the new property list */
+    if (FAIL == (fapl_id = H5P_create_id(pclass, TRUE)))
+        HGOTO_ERROR(H5E_PLIST, H5E_CANTCREATE, NULL, "unable to create property list");
+
+    /* Use the core VFD to store the view */
+    if (FAIL == H5Pset_fapl_core(fapl_id, H5Q_VIEW_CORE_INCREMENT, FALSE))
+        HGOTO_ERROR(H5E_PLIST, H5E_CANTSET, NULL, "unable to set property list to core VFD");
+
+    /* Create a new file or truncate an existing file. */
+    flags = H5F_ACC_EXCL | H5F_ACC_RDWR | H5F_ACC_CREAT;
+    if (NULL == (new_file = H5F_open("view", flags, H5P_FILE_CREATE_DEFAULT, fapl_id, H5AC_dxpl_id)))
+        HGOTO_ERROR(H5E_FILE, H5E_CANTOPENFILE, NULL, "unable to create file");
+
+    /* Construct a group location for root group of the file */
+    if (FAIL == H5G_root_loc(new_file, &file_loc))
+        HGOTO_ERROR(H5E_SYM, H5E_BADVALUE, NULL, "unable to create location for file")
+
+    /* Create the new group & get its ID */
+    if (NULL == (ret_grp = H5G_create_anon(&file_loc, H5P_GROUP_CREATE_DEFAULT, H5P_GROUP_ACCESS_DEFAULT)))
+        HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, NULL, "unable to create group");
+
+    /* Write view */
+    if (FAIL == H5Q__view_write(ret_grp, &view))
+        HGOTO_ERROR(H5E_QUERY, H5E_WRITEERROR, NULL, "can't write view");
 
     *result = multi_result;
     ret_value = ret_grp;
