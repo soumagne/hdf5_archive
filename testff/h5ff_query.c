@@ -453,21 +453,21 @@ error:
     return -1;
 }
 
-///* Read region */
+/* Read region */
 //static herr_t
 //test_query_read_selection(hid_t file, hid_t fapl, hid_t view, H5R_type_t rtype)
 //{
 //    hid_t refs = H5I_BADID, ref_type = H5I_BADID, ref_space = H5I_BADID;
 //    size_t n_refs, ref_size, ref_buf_size;
 //    void *ref_buf= NULL;
-//    href_t *ref_ptr = NULL;
+//    href_ff_t ref;
 //    const char *ref_path;
 //    hid_t obj = H5I_BADID, type = H5I_BADID, space = H5I_BADID, mem_space = H5I_BADID;
 //    size_t n_elem, elem_size, buf_size;
 //    float *buf = NULL;
 //    unsigned int i;
 //
-//    if (rtype == H5R_REGION)
+//    if (rtype == H5R_DATASET_REGION)
 //        ref_path = H5Q_VIEW_REF_REG_NAME;
 //    else if (rtype == H5R_OBJECT)
 //        ref_path = H5Q_VIEW_REF_OBJ_NAME;
@@ -609,8 +609,7 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
 
     HDgettimeofday(&t1, NULL);
 
-    H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack);
-//    if ((view = H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack)) < 0) FAIL_STACK_ERROR;
+    if ((view = H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack)) < 0) FAIL_STACK_ERROR;
 
     HDgettimeofday(&t2, NULL);
 
@@ -621,7 +620,7 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
     if (!(result & H5Q_REF_REG)) FAIL_STACK_ERROR;
 //    if (test_query_read_selection(file, fapl, view, H5R_DATASET_REGION) < 0) FAIL_STACK_ERROR;
 
-//    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
+    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
     if (test_query_close(query)) FAIL_STACK_ERROR;
 
     printf("\nObject query\n");
@@ -629,13 +628,12 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
 
     /* Test object query */
     if ((query = test_query_create_type(H5R_OBJECT)) < 0) FAIL_STACK_ERROR;
-    H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack);
-//    if ((view = H5Qapply(file, query, &result, H5P_DEFAULT)) < 0) FAIL_STACK_ERROR;
+    if ((view = H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack)) < 0) FAIL_STACK_ERROR;
 
     if (!(result & H5Q_REF_OBJ)) FAIL_STACK_ERROR;
 //    if (test_query_read_selection(file, fapl, view, H5R_OBJECT) < 0) FAIL_STACK_ERROR;
 
-//    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
+    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
     if (test_query_close(query)) FAIL_STACK_ERROR;
 
     printf("\nAttribute query\n");
@@ -643,13 +641,12 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
 
     /* Test attribute query */
     if ((query = test_query_create_type(H5R_ATTR)) < 0) FAIL_STACK_ERROR;
-    H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack);
-//    if ((view = H5Qapply(file, query, &result, H5P_DEFAULT)) < 0) FAIL_STACK_ERROR;
+    if ((view = H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack)) < 0) FAIL_STACK_ERROR;
 
     if (!(result & H5Q_REF_ATTR)) FAIL_STACK_ERROR;
 //    if (test_query_read_selection(file, fapl, view, H5R_ATTR) < 0) FAIL_STACK_ERROR;
 
-//    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
+    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
     if (test_query_close(query)) FAIL_STACK_ERROR;
 
     /* Release the read handle and close read context  */

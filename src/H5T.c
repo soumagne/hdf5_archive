@@ -230,7 +230,7 @@
 
 #define H5T_INIT_TYPE_REGREF_CORE {					      \
     H5T_INIT_TYPE_REF_COMMON						      \
-    dt->shared->u.atomic.u.r.rtype = H5R_REGION;			      \
+    dt->shared->u.atomic.u.r.rtype = H5R_DATASET_REGION;			      \
 }
 
 #define H5T_INIT_TYPE_ATTRREF_CORE {					      \
@@ -240,17 +240,17 @@
 
 #define H5T_INIT_TYPE_EXTOBJREF_CORE {					      \
     H5T_INIT_TYPE_REF_COMMON						      \
-    dt->shared->u.atomic.u.r.rtype = H5R_EXT_OBJECT;			      \
+    dt->shared->u.atomic.u.r.rtype = H5R_OBJECT_EXT;			      \
 }
 
 #define H5T_INIT_TYPE_EXTREGREF_CORE {					      \
     H5T_INIT_TYPE_REF_COMMON						      \
-    dt->shared->u.atomic.u.r.rtype = H5R_EXT_REGION;			      \
+    dt->shared->u.atomic.u.r.rtype = H5R_DATASET_REGION_EXT;			      \
 }
 
 #define H5T_INIT_TYPE_EXTATTRREF_CORE {					      \
     H5T_INIT_TYPE_REF_COMMON						      \
-    dt->shared->u.atomic.u.r.rtype = H5R_EXT_ATTR;			      \
+    dt->shared->u.atomic.u.r.rtype = H5R_ATTR_EXT;			      \
 }
 
 /* Define the code templates for the "SIZE_TMPL" in the H5T_INIT_TYPE macro */
@@ -364,7 +364,7 @@ hid_t H5T_STD_B32LE_g			= FAIL;
 hid_t H5T_STD_B64BE_g			= FAIL;
 hid_t H5T_STD_B64LE_g 			= FAIL;
 hid_t H5T_STD_REF_OBJ_g			= FAIL;
-hid_t H5T_STD_REF_REG_g			= FAIL;
+hid_t H5T_STD_REF_DSETREG_g			= FAIL;
 hid_t H5T_STD_REF_ATTR_g		= FAIL;
 hid_t H5T_STD_REF_EXT_OBJ_g		= FAIL;
 hid_t H5T_STD_REF_EXT_REG_g		= FAIL;
@@ -1006,7 +1006,7 @@ H5T__init_package(void)
     objref = dt;    /* Keep type for later */
 
     /* Dataset Region reference (i.e. selection inside a dataset) */
-    H5T_INIT_TYPE(REGREF, H5T_STD_REF_REG_g, ALLOC, -, NOSET, -)
+    H5T_INIT_TYPE(REGREF, H5T_STD_REF_DSETREG_g, ALLOC, -, NOSET, -)
     if(H5T_set_loc(dt, NULL, H5T_LOC_MEMORY) < 0)
         HGOTO_ERROR(H5E_DATATYPE, H5E_CANTINIT, FAIL, "invalid datatype location")
     regref = dt;    /* Keep type for later */
@@ -1500,7 +1500,7 @@ H5T_top_term_package(void)
             H5T_STD_B64BE_g			= FAIL;
             H5T_STD_B64LE_g 			= FAIL;
             H5T_STD_REF_OBJ_g			= FAIL;
-            H5T_STD_REF_REG_g			= FAIL;
+            H5T_STD_REF_DSETREG_g			= FAIL;
             H5T_STD_REF_ATTR_g			= FAIL;
 
             H5T_UNIX_D32BE_g			= FAIL;
@@ -4391,7 +4391,7 @@ H5T_cmp(const H5T_t *dt1, const H5T_t *dt2, hbool_t superset)
                                 HGOTO_DONE(1);
                             break;
 
-                        case H5R_REGION:
+                        case H5R_DATASET_REGION:
                             if (dt1->shared->u.atomic.u.r.loc < dt2->shared->u.atomic.u.r.loc)
                                 HGOTO_DONE(-1);
                             if (dt1->shared->u.atomic.u.r.loc > dt2->shared->u.atomic.u.r.loc)
@@ -4403,17 +4403,17 @@ H5T_cmp(const H5T_t *dt1, const H5T_t *dt2, hbool_t superset)
                             /*void */
                             break;
 
-                        case H5R_EXT_OBJECT:
+                        case H5R_OBJECT_EXT:
                             /* Does this need more to distinguish it? -QAK 8/25/15 */
                             /*void */
                             break;
 
-                        case H5R_EXT_REGION:
+                        case H5R_DATASET_REGION_EXT:
                             /* Does this need more to distinguish it? -QAK 8/25/15 */
                             /*void */
                             break;
 
-                        case H5R_EXT_ATTR:
+                        case H5R_ATTR_EXT:
                             /* Does this need more to distinguish it? -QAK 8/25/15 */
                             /*void */
                             break;

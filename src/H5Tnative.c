@@ -27,6 +27,7 @@
 #include "H5Pprivate.h"		/* Property lists			*/
 #include "H5MMprivate.h"	/* Memory management			*/
 #include "H5Tpkg.h"		/* Datatypes				*/
+#include "H5FFpublic.h"
 
 /* Static local functions */
 static H5T_t *H5T_get_native_integer(size_t prec, H5T_sign_t sign, H5T_direction_t direction,
@@ -219,7 +220,7 @@ H5T_get_native_type(H5T_t *dtype, H5T_direction_t direction, size_t *struct_alig
                     HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "cannot copy reference type")
 
                 /* Update size, offset and compound alignment for parent. */
-                if(H5T_cmp_offset(comp_size, offset, sizeof(href_t), (size_t)1, H5T_HREF_COMP_ALIGN_g, struct_align) < 0)
+                if(H5T_cmp_offset(comp_size, offset, sizeof(href_ff_t), (size_t)1, H5T_HREF_COMP_ALIGN_g, struct_align) < 0)
                     HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "cannot compute compound offset")
             } /* end case */
             break;

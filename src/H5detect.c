@@ -56,7 +56,7 @@ static const char *FileHeader = "\n\
 #undef NDEBUG
 #include "H5private.h"
 #include "H5Tpublic.h"
-#include "H5Rprivate.h"
+#include "H5FFpublic.h"
 
 #define MAXDETECT 64
 
@@ -1656,7 +1656,7 @@ detect_alignments(void)
     /* Detect structure alignment for pointers, hvl_t, href_t */
     DETECT_M(void *,              POINTER,      m_g[na_g]); na_g++;
     DETECT_M(hvl_t,               HVL,          m_g[na_g]); na_g++;
-    DETECT_M(href_t,              HREF,         m_g[na_g]); na_g++;
+    DETECT_M(href_ff_t,           HREF,         m_g[na_g]); na_g++;
 }
 
 

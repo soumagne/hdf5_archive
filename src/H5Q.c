@@ -263,7 +263,7 @@ static herr_t H5Q__apply_object_attr_value_iterate(void *elem, hid_t type_id,
 static herr_t H5Q__view_append(H5Q_view_t *view, H5R_type_t ref_type, void *ref);
 static herr_t H5Q__view_combine(H5Q_combine_op_t combine_op, H5Q_view_t *view1, H5Q_view_t *view2,
     unsigned result1, unsigned result2, H5Q_view_t *view, unsigned *result);
-//static herr_t H5Q__view_write(H5G_t *grp, H5Q_view_t *view);
+static herr_t H5Q__view_write(H5G_t *grp, H5Q_view_t *view);
 static herr_t H5Q__view_free(H5Q_view_t *view);
 
 
@@ -1895,7 +1895,7 @@ H5Q_apply_ff(hid_t loc_id, const H5Q_t *query, unsigned *result,
     unsigned flags;
     hid_t fapl_id = FAIL;
     H5F_t *new_file = NULL;
-//    H5G_loc_t file_loc;
+    H5G_loc_t file_loc;
 
     FUNC_ENTER_NOAPI_NOINIT
 
@@ -1921,34 +1921,34 @@ H5Q_apply_ff(hid_t loc_id, const H5Q_t *query, unsigned *result,
     if (!H5Q_QUEUE_EMPTY(&view.attr_refs))
         H5Q_LOG_DEBUG("Number of attr refs: %zu\n", view.attr_refs.n_elem);
 
-//    /* Get property list class */
-//    if (NULL == (pclass = (H5P_genclass_t *)H5I_object_verify(H5P_FILE_ACCESS, H5I_GENPROP_CLS)))
-//        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a property list class");
-//
-//    /* Create the new property list */
-//    if (FAIL == (fapl_id = H5P_create_id(pclass, TRUE)))
-//        HGOTO_ERROR(H5E_PLIST, H5E_CANTCREATE, NULL, "unable to create property list");
-//
-//    /* Use the core VFD to store the view */
-//    if (FAIL == H5Pset_fapl_core(fapl_id, H5Q_VIEW_CORE_INCREMENT, FALSE))
-//        HGOTO_ERROR(H5E_PLIST, H5E_CANTSET, NULL, "unable to set property list to core VFD");
-//
-//    /* Create a new file or truncate an existing file. */
-//    flags = H5F_ACC_EXCL | H5F_ACC_RDWR | H5F_ACC_CREAT;
-//    if (NULL == (new_file = H5F_open("view", flags, H5P_FILE_CREATE_DEFAULT, fapl_id, H5AC_dxpl_id)))
-//        HGOTO_ERROR(H5E_FILE, H5E_CANTOPENFILE, NULL, "unable to create file");
-//
-//    /* Construct a group location for root group of the file */
-//    if (FAIL == H5G_root_loc(new_file, &file_loc))
-//        HGOTO_ERROR(H5E_SYM, H5E_BADVALUE, NULL, "unable to create location for file")
-//
-//    /* Create the new group & get its ID */
-//    if (NULL == (ret_grp = H5G_create_anon(&file_loc, H5P_GROUP_CREATE_DEFAULT, H5P_GROUP_ACCESS_DEFAULT)))
-//        HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, NULL, "unable to create group");
-//
-//    /* Write view */
-//    if (FAIL == H5Q__view_write(ret_grp, &view))
-//        HGOTO_ERROR(H5E_QUERY, H5E_WRITEERROR, NULL, "can't write view");
+    /* Get property list class */
+    if (NULL == (pclass = (H5P_genclass_t *)H5I_object_verify(H5P_FILE_ACCESS, H5I_GENPROP_CLS)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a property list class");
+
+    /* Create the new property list */
+    if (FAIL == (fapl_id = H5P_create_id(pclass, TRUE)))
+        HGOTO_ERROR(H5E_PLIST, H5E_CANTCREATE, NULL, "unable to create property list");
+
+    /* Use the core VFD to store the view */
+    if (FAIL == H5Pset_fapl_core(fapl_id, H5Q_VIEW_CORE_INCREMENT, FALSE))
+        HGOTO_ERROR(H5E_PLIST, H5E_CANTSET, NULL, "unable to set property list to core VFD");
+
+    /* Create a new file or truncate an existing file. */
+    flags = H5F_ACC_EXCL | H5F_ACC_RDWR | H5F_ACC_CREAT;
+    if (NULL == (new_file = H5F_open("view", flags, H5P_FILE_CREATE_DEFAULT, fapl_id, H5AC_dxpl_id)))
+        HGOTO_ERROR(H5E_FILE, H5E_CANTOPENFILE, NULL, "unable to create file");
+
+    /* Construct a group location for root group of the file */
+    if (FAIL == H5G_root_loc(new_file, &file_loc))
+        HGOTO_ERROR(H5E_SYM, H5E_BADVALUE, NULL, "unable to create location for file")
+
+    /* Create the new group & get its ID */
+    if (NULL == (ret_grp = H5Gcreate_anon(&file_loc, H5P_GROUP_CREATE_DEFAULT, H5P_GROUP_ACCESS_DEFAULT)))
+        HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, NULL, "unable to create group");
+
+    /* Write view */
+    if (FAIL == H5Q__view_write(ret_grp, &view))
+        HGOTO_ERROR(H5E_QUERY, H5E_WRITEERROR, NULL, "can't write view");
 
     ret_value = ret_grp;
 
@@ -2627,84 +2627,84 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-//static herr_t
-//H5Q__view_write(H5G_t *grp, H5Q_view_t *view)
-//{
-//    H5G_loc_t loc;
-//    H5D_t *dset = NULL;
-//    H5S_t *mem_space = NULL;
-//    H5S_t *space = NULL;
-//    H5Q_ref_head_t *refs[H5Q_VIEW_REF_NTYPES] = { &view->reg_refs, &view->obj_refs,
-//            &view->attr_refs };
-//    const char *dset_name[H5Q_VIEW_REF_NTYPES] = { H5Q_VIEW_REF_REG_NAME,
-//            H5Q_VIEW_REF_OBJ_NAME, H5Q_VIEW_REF_ATTR_NAME };
-//    hid_t ref_types[H5Q_VIEW_REF_NTYPES] = { H5T_STD_REF_EXT_REG,
-//            H5T_STD_REF_EXT_OBJ, H5T_STD_REF_EXT_ATTR };
-//    herr_t ret_value = SUCCEED; /* Return value */
-//    int i;
-//
-//    FUNC_ENTER_NOAPI_NOINIT
-//
-//    HDassert(grp);
-//
-//    /* Get location of group */
-//    loc.oloc = H5G_oloc(grp);
-//    loc.path = H5G_nameof(grp);
-//
-//    /* Iterate over reference types and write references if any */
-//    for (i = 0; i < H5Q_VIEW_REF_NTYPES; i++) {
-//        H5Q_ref_entry_t *ref_entry = NULL;
-//        hsize_t n_elem = refs[i]->n_elem;
-//        hsize_t start = 0;
-//
-//        if (!n_elem)
-//            continue;
-//
-//        /* Create dataspace */
-//        if (NULL == (space = H5S_create_simple(1, &n_elem, NULL)))
-//            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, FAIL, "unable to create dataspace");
-//
-//        /* Create the new dataset & get its ID */
-//        H5Q_LOG_DEBUG("Create reference dataset: %s", dset_name[i]);
-//        if (NULL == (dset = H5D_create_named(&loc, dset_name[i], ref_types[i],
-//                space, H5P_LINK_CREATE_DEFAULT, H5P_DATASET_CREATE_DEFAULT,
-//                H5P_DATASET_ACCESS_DEFAULT, H5AC_dxpl_id)))
-//            HGOTO_ERROR(H5E_DATASET, H5E_CANTCREATE, FAIL, "unable to create dataset");
-//
-//        /* Iterate over reference entries in view */
-//        H5Q_QUEUE_FOREACH(ref_entry, refs[i], entry) {
-//            hsize_t count = 1;
-//
-//            if (NULL == (mem_space = H5S_create_simple(1, &count, NULL)))
-//                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, FAIL, "unable to create dataspace");
-//            if (FAIL == H5S_select_hyperslab(space, H5S_SELECT_SET, &start, NULL, &count, NULL))
-//                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTINIT, FAIL, "unable to set hyperslab selection")
-//            if (FAIL == H5D_write(dset, FALSE, ref_types[i], mem_space, space,
-//                    H5P_DATASET_XFER_DEFAULT, &ref_entry->ref))
-//                HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "unable to write dataset");
-//            if (FAIL == H5S_close(mem_space))
-//                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataspace");
-//            mem_space = NULL;
-//
-//            /* Increment reference position in file */
-//            start++;
-//        }
-//
-//        if (FAIL == H5D_close(dset))
-//            HGOTO_ERROR(H5E_DATASET, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataset");
-//        dset = NULL;
-//        if (FAIL == H5S_close(space))
-//            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataspace");
-//        space = NULL;
-//    }
-//
-//done:
-//    if (dset) H5D_close(dset);
-//    if (space) H5S_close(space);
-//    if (mem_space) H5S_close(mem_space);
-//
-//    FUNC_LEAVE_NOAPI(ret_value)
-//} /* end H5Q__view_write */
+static herr_t
+H5Q__view_write(H5G_t *grp, H5Q_view_t *view)
+{
+    H5G_loc_t loc;
+    H5D_t *dset = NULL;
+    H5S_t *mem_space = NULL;
+    H5S_t *space = NULL;
+    H5Q_ref_head_t *refs[H5Q_VIEW_REF_NTYPES] = { &view->reg_refs, &view->obj_refs,
+            &view->attr_refs };
+    const char *dset_name[H5Q_VIEW_REF_NTYPES] = { H5Q_VIEW_REF_REG_NAME,
+            H5Q_VIEW_REF_OBJ_NAME, H5Q_VIEW_REF_ATTR_NAME };
+    hid_t ref_types[H5Q_VIEW_REF_NTYPES] = { H5T_STD_REF_EXT_REG,
+            H5T_STD_REF_EXT_OBJ, H5T_STD_REF_EXT_ATTR };
+    herr_t ret_value = SUCCEED; /* Return value */
+    int i;
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(grp);
+
+    /* Get location of group */
+    loc.oloc = H5G_oloc(grp);
+    loc.path = H5G_nameof(grp);
+
+    /* Iterate over reference types and write references if any */
+    for (i = 0; i < H5Q_VIEW_REF_NTYPES; i++) {
+        H5Q_ref_entry_t *ref_entry = NULL;
+        hsize_t n_elem = refs[i]->n_elem;
+        hsize_t start = 0;
+
+        if (!n_elem)
+            continue;
+
+        /* Create dataspace */
+        if (NULL == (space = H5S_create_simple(1, &n_elem, NULL)))
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, FAIL, "unable to create dataspace");
+
+        /* Create the new dataset & get its ID */
+        H5Q_LOG_DEBUG("Create reference dataset: %s", dset_name[i]);
+        if (NULL == (dset = H5D_create_named(&loc, dset_name[i], ref_types[i],
+                space, H5P_LINK_CREATE_DEFAULT, H5P_DATASET_CREATE_DEFAULT,
+                H5P_DATASET_ACCESS_DEFAULT, H5AC_dxpl_id)))
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTCREATE, FAIL, "unable to create dataset");
+
+        /* Iterate over reference entries in view */
+        H5Q_QUEUE_FOREACH(ref_entry, refs[i], entry) {
+            hsize_t count = 1;
+
+            if (NULL == (mem_space = H5S_create_simple(1, &count, NULL)))
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, FAIL, "unable to create dataspace");
+            if (FAIL == H5S_select_hyperslab(space, H5S_SELECT_SET, &start, NULL, &count, NULL))
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTINIT, FAIL, "unable to set hyperslab selection")
+            if (FAIL == H5D_write(dset, FALSE, ref_types[i], mem_space, space,
+                    H5P_DATASET_XFER_DEFAULT, &ref_entry->ref))
+                HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "unable to write dataset");
+            if (FAIL == H5S_close(mem_space))
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataspace");
+            mem_space = NULL;
+
+            /* Increment reference position in file */
+            start++;
+        }
+
+        if (FAIL == H5D_close(dset))
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataset");
+        dset = NULL;
+        if (FAIL == H5S_close(space))
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataspace");
+        space = NULL;
+    }
+
+done:
+    if (dset) H5D_close(dset);
+    if (space) H5S_close(space);
+    if (mem_space) H5S_close(mem_space);
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5Q__view_write */
 
 /*-------------------------------------------------------------------------
  * Function:    H5Q__view_free
