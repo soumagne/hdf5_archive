@@ -39,6 +39,7 @@
 #include "H5FFpublic.h"
 #include "H5VLiod.h"
 #include "H5VLiod_client.h"
+#include "H5VLnative.h"
 
 
 /****************/
@@ -1843,6 +1844,9 @@ H5Qapply_ff(hid_t loc_id, hid_t query_id, unsigned *result, hid_t vcpl_id,
     H5Q_t *query = NULL;
     H5G_t *ret_grp;
     hid_t ret_value;
+    hid_t native_vol = H5VL_NATIVE;
+    H5VL_class_t *vol_cls = NULL; /* VOL Class structure for callback info */
+    H5VL_t *vol_info = NULL;      /* VOL info struct */
 
     FUNC_ENTER_API(FAIL)
     H5TRACE4("i", "ii*Iui", loc_id, query_id, result, vcpl_id);
@@ -1867,8 +1871,23 @@ H5Qapply_ff(hid_t loc_id, hid_t query_id, unsigned *result, hid_t vcpl_id,
     if (NULL == (ret_grp = H5Q_apply_ff(loc_id, query, result, vcpl_id, rcxt_id)))
         HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
 
-    if (FAIL == (ret_value = H5I_register(H5I_GROUP, ret_grp, TRUE)))
-        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register group");
+//    if (FAIL == (ret_value = H5I_register(H5I_GROUP, ret_grp, TRUE)))
+//        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register group");
+
+    if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(native_vol, H5I_VOL)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a VOL plugin ID")
+
+    /* setup VOL info struct */
+    if(NULL == (vol_info = H5FL_CALLOC(H5VL_t)))
+        HGOTO_ERROR(H5E_FILE, H5E_NOSPACE, FAIL, "can't allocate VL info struct")
+    vol_info->vol_cls = vol_cls;
+    vol_info->vol_id = native_vol;
+    if(H5I_inc_ref(vol_info->vol_id, FALSE) < 0)
+        HGOTO_ERROR(H5E_ATOM, H5E_CANTINC, FAIL, "unable to increment ref count on VOL plugin")
+
+    /* Get an atom for the group */
+    if((ret_value = H5VL_register_id(H5I_GROUP, (void *)ret_grp, vol_info, TRUE)) < 0)
+        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to atomize group handle")
 
 done:
     FUNC_LEAVE_API(ret_value)
