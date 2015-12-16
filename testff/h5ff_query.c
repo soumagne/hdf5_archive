@@ -548,16 +548,14 @@ test_query_read_selection(size_t file_count, const char **filenames,
             HDfree(buf);
             buf = NULL;
         }
-//        if (rtype == H5R_ATTR) {
-//            char attr_name[MAX_NAME];
-//
-//            if (H5Rget_name_ff(ref_ptr, attr_name, MAX_NAME) < 0) FAIL_STACK_ERROR;
-//            printf("Attribute name: %s\n", attr_name);
-//
-//            if (H5Aclose_ff(obj, estack) < 0) FAIL_STACK_ERROR;
-//        } else {
-            if (H5Dclose_ff(obj, estack) < 0) FAIL_STACK_ERROR;
-//        }
+        if (rtype == H5R_ATTR) {
+            char attr_name[MAX_NAME];
+
+            if (H5Rget_attr_name_ff(ref_ptr, attr_name, MAX_NAME) < 0) FAIL_STACK_ERROR;
+            printf("Attribute name: %s\n", attr_name);
+        }
+        if (H5Dclose_ff(obj, estack) < 0) FAIL_STACK_ERROR;
+
         ref_ptr = (href_ff_t *)((uint8_t *) ref_ptr + ref_size);
     }
 
