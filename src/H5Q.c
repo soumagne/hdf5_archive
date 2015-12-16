@@ -170,7 +170,7 @@ struct {                                                                    \
 #define H5Q_VIEW_REF_NTYPES      3          /* number of reference types */
 #define H5Q_VIEW_CORE_INCREMENT  1024       /* increment for core VFD */
 
-#define H5Q_DEBUG
+//#define H5Q_DEBUG
 
 #ifdef H5Q_DEBUG
 #define H5Q_LOG_DEBUG(...) do {                                 \

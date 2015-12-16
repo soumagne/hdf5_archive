@@ -515,7 +515,7 @@ test_query_read_selection(size_t file_count, const char **filenames,
             loc_rcxt = rcxts[0];
         }
         if ((obj = H5Rdereference_ff(loc, H5P_DEFAULT, ref_ptr, loc_rcxt, estack)) < 0) FAIL_STACK_ERROR;
-        if (H5Iget_name(obj, obj_path, MAX_NAME) < 0) FAIL_STACK_ERROR;
+        if (H5Rget_name_ff(ref_ptr, obj_path, MAX_NAME) < 0) FAIL_STACK_ERROR;
         printf("Found reference from object: %s\n", obj_path);
 
         if (rtype == H5R_DATASET_REGION) {
