@@ -146,6 +146,7 @@ H5_DLL H5T_t *H5T_get_actual_type(H5T_t *dt);
 
 /* Reference specific functions */
 H5_DLL H5R_type_t H5T_get_ref_type(const H5T_t *dt);
+H5_DLL herr_t H5T_ref_reclaim(void *elem, hid_t type_id, unsigned ndim, const hsize_t *point, void *_op_data);
 
 /* Operations on named datatypes */
 H5_DLL H5T_t *H5T_open(const H5G_loc_t *loc, hid_t dxpl_id);

@@ -172,6 +172,10 @@ H5_DLL hid_t H5D_get_access_plist(H5D_t *dset);
 H5_DLL hid_t H5D_get_space(H5D_t *dset);
 H5_DLL hid_t H5D_get_type(H5D_t *dset);
 
+/* Functions that operate on reference data */
+H5_DLL herr_t H5D_ref_reclaim(hid_t type_id, H5S_t *space, hid_t plist_id,
+    void *buf);
+
 /* Functions that operate on vlen data */
 H5_DLL herr_t H5D_vlen_reclaim(hid_t type_id, H5S_t *space, hid_t plist_id,
     void *buf);
