@@ -637,6 +637,7 @@ set (H5VL_SRCS
     ${HDF5_SRC_DIR}/H5VL.c
     ${HDF5_SRC_DIR}/H5VLint.c
     ${HDF5_SRC_DIR}/H5VLnative.c
+    ${HDF5_SRC_DIR}/H5ES.c
 )
 
 set (H5VL_HDRS
@@ -653,7 +654,6 @@ IF (HDF5_ENABLE_EFF)
         ${HDF5_SRC_DIR}/H5FF_obj.c
         ${HDF5_SRC_DIR}/H5FF_ref.c
         ${HDF5_SRC_DIR}/H5M.c
-        ${HDF5_SRC_DIR}/H5ES.c
         ${HDF5_SRC_DIR}/H5RC.c
         ${HDF5_SRC_DIR}/H5TR.c
         ${HDF5_SRC_DIR}/H5V.c

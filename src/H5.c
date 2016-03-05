@@ -336,7 +336,6 @@ H5_term_library(void)
             pending += DOWN(R);
             pending += DOWN(S);
             pending += DOWN(T);
-            pending += DOWN(M);
         } /* end if */
 
         /* Don't shut down "low-level" components until "high-level" components
@@ -349,6 +348,7 @@ H5_term_library(void)
             pending += DOWN(Z);
 
 #ifdef H5_HAVE_EFF
+            pending += DOWN(M);
             pending += DOWN(TR);
             pending += DOWN(RC);
             pending += DOWN(V);

@@ -220,7 +220,6 @@ typedef struct attr_iterate_t {
 
 typedef binary_buf_t loc_info_t;
 
-#endif /* H5_HAVE_EFF */
 
 H5_DLL int H5VL_iod_get_type_info(hid_t type_id, H5VL_iod_type_info_t *type_info);
 H5_DLL void H5VL_iod_type_info_reset(H5VL_iod_type_info_t *type_info);
@@ -234,7 +233,6 @@ H5_DLL int H5VL_iod_create_segments_recv(char *buf, H5VL_iod_type_info_t *type_i
            size_t *free_list_len);
 H5_DLL void H5VL_iod_free_list_free(void **free_list, size_t free_list_len);
 
-#ifdef H5_HAVE_EFF
 
 H5_DLL herr_t EFF_setup_coresident(MPI_Comm comm, MPI_Info info);
 H5_DLL herr_t EFF_terminate_coresident(void);
