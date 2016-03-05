@@ -107,9 +107,7 @@ H5_DLL H5Q_t *H5Q_decode(const unsigned char **buf);
 
 /* Apply query */
 H5_DLL herr_t H5Q_apply_atom(const H5Q_t *query, hbool_t *result, ...);
-H5_DLL H5G_t *H5Q_apply_ff(hid_t loc_id, const H5Q_t *query, unsigned *result,
-    hid_t vcpl_id, hid_t rcxt_id);
-H5_DLL H5G_t *H5Q_apply_multi_ff(size_t loc_count, hid_t *loc_ids, const H5Q_t *query,
-    unsigned *result, hid_t vcpl_id, hid_t *rcxt_ids);
+H5_DLL H5G_t *H5Q_apply(const H5G_loc_t *loc, const H5Q_t *query, unsigned *result, hid_t vcpl_id);
+H5_DLL H5G_t *H5Q_apply_multi(size_t loc_count, const H5G_loc_t *locs, const H5Q_t *query, unsigned *result, hid_t vcpl_id);
 
 #endif /* _H5Qprivate_H */
