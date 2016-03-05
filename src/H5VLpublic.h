@@ -192,7 +192,7 @@ struct H5VL_loc_by_addr {
 
 struct H5VL_loc_by_ref {
     H5R_type_t ref_type;
-    const void *_ref;
+    href_t _ref;
     hid_t lapl_id;
 };
 

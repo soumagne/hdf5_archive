@@ -3057,18 +3057,22 @@ H5VL_native_object_open(void *obj, H5VL_loc_params_t loc_params, H5I_type_t *ope
             }
         case H5VL_OBJECT_BY_REF:
             {
-                H5F_t *file = NULL;
+                if (H5R_ATTR == loc_params.loc_data.loc_by_ref.ref_type) {
+                    H5A_t *attr;        /* Attribute */
 
-                /* Get the file pointer from the entry */
-                file = loc.oloc->file;
+                    /* Get the attribute */
+                    if((attr = H5R__get_attr(loc.oloc->file, dxpl_id, loc_params.loc_data.loc_by_ref._ref)) == NULL)
+                        HGOTO_ERROR(H5E_REFERENCE, H5E_CANTCREATE, NULL, "unable to open attribute")
 
-                /* Create reference */
-                if((temp_id = H5R_dereference(file, loc_params.loc_data.loc_by_ref.lapl_id, 
-                                                dxpl_id, 
-                                                loc_params.loc_data.loc_by_ref.ref_type, 
-                                                loc_params.loc_data.loc_by_ref._ref, 
-                                                TRUE)) < 0)
-                    HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, NULL, "unable to dereference object")
+                    /* Atomize */
+                    if((temp_id = H5I_register (H5I_ATTR, attr, TRUE)) < 0)
+                        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, NULL, "unable to register attribute atom")
+                } else {
+                    /* Create reference */
+                    if((temp_id = H5R__get_object(loc.oloc->file, loc_params.loc_data.loc_by_ref.lapl_id,
+                            dxpl_id, loc_params.loc_data.loc_by_ref._ref, TRUE)) < 0)
+                        HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, NULL, "unable to dereference object")
+                }
                 break;
             }
         case H5VL_OBJECT_BY_SELF:
@@ -3157,12 +3161,11 @@ H5VL_native_object_get(void *obj, H5VL_loc_params_t loc_params, H5VL_object_get_
         case H5VL_REF_GET_REGION:
             {
                 hid_t       *ret     =  va_arg (arguments, hid_t *);
-                H5R_type_t  H5_ATTR_UNUSED ref_type =  va_arg (arguments, H5R_type_t);
                 void        *ref     =  va_arg (arguments, void *);
                 H5S_t       *space = NULL;    /* Dataspace object */
 
                 /* Get the dataspace with the correct region selected */
-                if((space = H5R_get_region(loc.oloc->file, dxpl_id, ref)) == NULL)
+                if((space = H5R__get_region(loc.oloc->file, dxpl_id, ref)) == NULL)
                     HGOTO_ERROR(H5E_REFERENCE, H5E_CANTCREATE, FAIL, "unable to create dataspace")
 
                 /* Atomize */
@@ -3175,11 +3178,10 @@ H5VL_native_object_get(void *obj, H5VL_loc_params_t loc_params, H5VL_object_get_
         case H5VL_REF_GET_TYPE:
             {
                 H5O_type_t  *obj_type  =  va_arg (arguments, H5O_type_t *);
-                H5R_type_t  ref_type   =  va_arg (arguments, H5R_type_t);
                 void        *ref       =  va_arg (arguments, void *);
 
                 /* Get the object information */
-                if(H5R_get_obj_type(loc.oloc->file, dxpl_id, ref_type, ref, obj_type) < 0)
+                if(H5R__get_obj_type(loc.oloc->file, dxpl_id, ref, obj_type) < 0)
                     HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to determine object type")
                 break;
             }
@@ -3193,7 +3195,7 @@ H5VL_native_object_get(void *obj, H5VL_loc_params_t loc_params, H5VL_object_get_
                 void        *ref       = va_arg (arguments, void *);
 
                 /* Get name */
-                if((*ret = H5R_get_name(&loc, H5P_DEFAULT, dxpl_id, ref_type, ref, name, size)) < 0)
+                if((*ret = H5R__get_obj_name(loc.oloc->file, H5P_DEFAULT, dxpl_id, ref, name, size)) < 0)
                     HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to determine object path")
                 break;
             }
@@ -3284,18 +3286,37 @@ H5VL_native_object_specific(void *obj, H5VL_loc_params_t loc_params, H5VL_object
         case H5VL_REF_CREATE:
             {
                 void        *ref      = va_arg (arguments, void *);
-                const char  *name     = va_arg (arguments, char *);
+                href_t      *ref_ptr  = (href_t *)ref;
                 H5R_type_t  ref_type  = va_arg (arguments, H5R_type_t);
-                hid_t       space_id  = va_arg (arguments, hid_t);
-                H5S_t       *space = NULL;   /* Pointer to dataspace containing region */
-                
-                if(space_id != (-1) && (NULL == (space = (H5S_t *)H5I_object_verify(space_id, H5I_DATASPACE))))
-                    HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a dataspace")
+                const char  *name     = va_arg (arguments, char *);
 
                 /* Create reference */
-                if(H5R_create(ref, &loc, name, NULL, ref_type, space, dxpl_id) < 0)
-                    HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to create reference")
-
+                switch (ref_type) {
+                    case H5R_OBJECT:
+                        if(NULL == (*ref_ptr = H5R_create_object(&loc, name, dxpl_id)))
+                            HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to create reference")
+                        break;
+                    case H5R_REGION:
+                    {
+                        H5S_t *space = va_arg (arguments, H5S_t *);
+                        if(NULL == (*ref_ptr = H5R_create_region(&loc, name, dxpl_id, space)))
+                            HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to create reference")
+                        break;
+                    }
+                    case H5R_ATTR:
+                    {
+                        char *attr_name = va_arg (arguments, char *);
+                        if(NULL == (*ref_ptr = H5R_create_attr(&loc, name, dxpl_id, attr_name)))
+                            HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to create reference")
+                        break;
+                    }
+                    case H5R_EXT_OBJECT:
+                    case H5R_EXT_REGION:
+                    case H5R_EXT_ATTR:
+                    default:
+                        HDassert("unknown reference type" && 0);
+                        HGOTO_ERROR(H5E_REFERENCE, H5E_UNSUPPORTED, FAIL, "internal error (unknown reference type)")
+                }
                 break;
             }
         default:
