@@ -1961,27 +1961,31 @@ H5R__get_attr_name(H5F_t *f, href_t _ref, char *name, size_t size)
 ssize_t
 H5Rget_attr_name(hid_t loc_id, href_t _ref, char *name, size_t size)
 {
-    H5G_loc_t loc;      /* Group location */
-    H5F_t *file;        /* File object */
+    H5VL_object_t    *obj = NULL; /* Object token of loc_id */
+    H5VL_loc_params_t loc_params;
     struct href_t *ref = (struct href_t *) _ref; /* Reference */
     ssize_t ret_value;  /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
     /* Check args */
-    if(H5G_loc(loc_id, &loc) < 0)
-        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a location")
     if(ref == NULL)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid reference pointer")
-    if((ref->ref_type != H5R_ATTR) && (ref->ref_type != H5R_EXT_ATTR))
+    if(ref->ref_type <= H5R_BADTYPE || ref->ref_type >= H5R_MAXTYPE)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid reference type")
 
-    /* Get the file pointer from the entry */
-    file = loc.oloc->file;
+    loc_params.type = H5VL_OBJECT_BY_SELF;
+    loc_params.obj_type = H5I_get_type(loc_id);
 
-    /* Get name */
-    if((ret_value = H5R__get_attr_name(file, ref, name, size)) < 0)
-        HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to determine object path")
+    /* Get the file object */
+    if(NULL == (obj = (H5VL_object_t *)H5I_object(loc_id)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid file identifier")
+
+    /* Get the object name through the VOL */
+    if(H5VL_object_get(obj->vol_obj, loc_params, obj->vol_info->vol_cls,
+        H5VL_REF_GET_ATTR_NAME, H5AC_ind_dxpl_id, H5_REQUEST_NULL, &ret_value, name,
+        size, ref->ref_type, _ref) < 0)
+        HGOTO_ERROR(H5E_REFERENCE, H5E_CANTGET, FAIL, "unable to get object name")
 
 done:
     FUNC_LEAVE_API(ret_value)

@@ -151,6 +151,7 @@ typedef enum H5VL_link_specific_t {
 /* types for object GET callback */
 typedef enum H5VL_object_get_t {
     H5VL_REF_GET_NAME,                 /* object name                       */
+    H5VL_REF_GET_ATTR_NAME,            /* attribute name                    */
     H5VL_REF_GET_REGION,               /* dataspace of region               */
     H5VL_REF_GET_TYPE                  /* type of object                    */
 } H5VL_object_get_t;
