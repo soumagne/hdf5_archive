@@ -1889,7 +1889,6 @@ done:
 ssize_t
 H5R__get_attr_name(H5F_t *f, href_t _ref, char *name, size_t size)
 {
-    H5O_loc_t oloc;             /* Object location describing object for reference */
     ssize_t ret_value = -1;     /* Return value */
     const uint8_t *p = NULL;    /* Pointer to reference to decode */
     size_t attr_name_len;       /* Length of the attribute name */
@@ -1899,13 +1898,8 @@ H5R__get_attr_name(H5F_t *f, href_t _ref, char *name, size_t size)
     FUNC_ENTER_NOAPI_NOINIT_NOERR
 
     /* Check args */
-    HDassert(f);
     HDassert(ref);
     HDassert((ref->ref_type == H5R_ATTR) || (ref->ref_type == H5R_EXT_ATTR));
-
-    /* Initialize the object location */
-    H5O_loc_reset(&oloc);
-    oloc.file = f;
 
     /* Point to reference buffer now */
     p = (const uint8_t *)ref->ref.serial.buf;
@@ -1927,6 +1921,14 @@ H5R__get_attr_name(H5F_t *f, href_t _ref, char *name, size_t size)
         /* Skip the path name */
         p += pathname_len;
     } else {
+        H5O_loc_t oloc; /* Object location describing object for reference */
+
+        HDassert(f);
+
+        /* Initialize the object location */
+        H5O_loc_reset(&oloc);
+        oloc.file = f;
+
         /* Get the object oid for the dataset */
         H5F_addr_decode(oloc.file, &p, &(oloc.addr));
     }
