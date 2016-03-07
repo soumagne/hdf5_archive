@@ -142,7 +142,7 @@ H5Qapply_ff(hid_t loc_id, hid_t query_id, unsigned *result, hid_t vcpl_id,
     H5VL_t *vol_info = NULL;      /* VOL info struct */
 
     FUNC_ENTER_API(FAIL)
-    H5TRACE4("i", "ii*Iui", loc_id, query_id, result, vcpl_id);
+    H5TRACE6("i", "ii*Iuiii", loc_id, query_id, result, vcpl_id, rcxt_id, estack_id);
 
     /* Check args and get the query objects */
     if (NULL == (query = (H5Q_t *) H5I_object_verify(query_id, H5I_QUERY)))
@@ -816,6 +816,8 @@ H5Qapply_multi_ff(size_t loc_count, hid_t *loc_ids, hid_t query_id,
     H5VL_t *vol_info = NULL;      /* VOL info struct */
 
     FUNC_ENTER_API(FAIL)
+    H5TRACE7("i", "z*ii*Iui*ii", loc_count, loc_ids, query_id, result, vcpl_id,
+             rcxt_ids, estack_id);
 
     /* Check args and get the query objects */
     if (!loc_count)

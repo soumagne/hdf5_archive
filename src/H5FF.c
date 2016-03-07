@@ -2794,7 +2794,7 @@ H5Dquery_ff(hid_t dset_id, hid_t file_space_id, hid_t query_id, hid_t rcxt_id)
     hid_t ret_value = FAIL;
 
     FUNC_ENTER_API(FAIL)
-    H5TRACE4("i", "iiii", dset_id, query_id, scope_id, rcxt_id);
+    H5TRACE4("i", "iiii", dset_id, file_space_id, query_id, rcxt_id);
 
     if (FAIL == H5Qget_combine_op(query_id, &combine_op))
         HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get combine operator");

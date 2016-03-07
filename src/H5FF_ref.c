@@ -416,6 +416,7 @@ H5Rget_object_ff(hid_t loc_id, hid_t H5_ATTR_UNUSED oapl_id, href_t _ref,
     hid_t ret_value;              /* Return value */
 
     FUNC_ENTER_API(FAIL)
+    H5TRACE5("i", "iirii", loc_id, oapl_id, _ref, rcxt_id, estack_id);
 
     /* Check args */
     if(ref == NULL)
