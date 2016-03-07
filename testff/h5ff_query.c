@@ -461,7 +461,7 @@ test_query_read_selection(size_t file_count, const char **filenames,
     hid_t refs = H5I_BADID, ref_type = H5I_BADID, ref_space = H5I_BADID;
     size_t n_refs, ref_size, ref_buf_size;
     void *ref_buf= NULL;
-    href_ff_t *ref_ptr;
+    href_t *ref_ptr;
     const char *ref_path;
     hid_t obj = H5I_BADID, type = H5I_BADID, space = H5I_BADID, mem_space = H5I_BADID;
     size_t n_elem, elem_size, buf_size;
@@ -491,14 +491,14 @@ test_query_read_selection(size_t file_count, const char **filenames,
     if ((H5Dread(refs, ref_type, H5S_ALL, ref_space, H5P_DEFAULT, ref_buf)) < 0) FAIL_STACK_ERROR;
 
     /* Get dataset / space / type ID for the referenced dataset region */
-    ref_ptr = (href_ff_t *) ref_buf;
+    ref_ptr = (href_t *) ref_buf;
     for (i = 0; i < n_refs; i++) {
         char obj_path[MAX_NAME];
         char filename[MAX_NAME];
         hid_t loc = H5I_BADID;
         hid_t loc_rcxt = H5I_BADID;
 
-        if (H5Rget_filename_ff(ref_ptr, filename, MAX_NAME) < 0) FAIL_STACK_ERROR;
+        if (H5Rget_file_name(ref_ptr[i], filename, MAX_NAME) < 0) FAIL_STACK_ERROR;
         printf("Found reference from file: %s\n", filename);
         if (file_count > 1) {
             int j;
@@ -514,14 +514,14 @@ test_query_read_selection(size_t file_count, const char **filenames,
             loc = files[0];
             loc_rcxt = rcxts[0];
         }
-        if ((obj = H5Rdereference_ff(loc, H5P_DEFAULT, ref_ptr, loc_rcxt, estack)) < 0) FAIL_STACK_ERROR;
-        if (H5Rget_name_ff(ref_ptr, obj_path, MAX_NAME) < 0) FAIL_STACK_ERROR;
+        if (H5Rget_obj_name(loc, ref_ptr[i], obj_path, MAX_NAME) < 0) FAIL_STACK_ERROR;
         printf("Found reference from object: %s\n", obj_path);
+        if ((obj = H5Rget_object_ff(loc, H5P_DEFAULT, ref_ptr[i], loc_rcxt, estack)) < 0) FAIL_STACK_ERROR;
 
         if (rtype == H5R_DATASET_REGION) {
             int j;
 
-            if ((space = H5Rget_region_ff(ref_ptr)) < 0) FAIL_STACK_ERROR;
+            if ((space = H5Rget_region2(loc, ref_ptr[i])) < 0) FAIL_STACK_ERROR;
             if ((type = H5Dget_type(obj)) < 0) FAIL_STACK_ERROR;
             if (0 == (n_elem = (size_t) H5Sget_select_npoints(space))) FAIL_STACK_ERROR;
             if (0 == (elem_size = H5Tget_size(type))) FAIL_STACK_ERROR;
@@ -551,12 +551,10 @@ test_query_read_selection(size_t file_count, const char **filenames,
         if (rtype == H5R_ATTR) {
             char attr_name[MAX_NAME];
 
-            if (H5Rget_attr_name_ff(ref_ptr, attr_name, MAX_NAME) < 0) FAIL_STACK_ERROR;
+            if (H5Rget_attr_name(loc, ref_ptr[i], attr_name, MAX_NAME) < 0) FAIL_STACK_ERROR;
             printf("Attribute name: %s\n", attr_name);
         }
         if (H5Dclose_ff(obj, estack) < 0) FAIL_STACK_ERROR;
-
-        ref_ptr = (href_ff_t *)((uint8_t *) ref_ptr + ref_size);
     }
 
     if ((H5Dref_reclaim(ref_type, ref_space, H5P_DEFAULT, ref_buf)) < 0) FAIL_STACK_ERROR;

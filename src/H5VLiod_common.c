@@ -17,6 +17,9 @@
 #include <mchecksum.h>          /* Mercury Checksum library             */
 #endif /* H5_HAVE_EFF */
 
+#define H5R_FRIEND
+#include "H5Rpkg.h"
+
 /*
  * Local typedefs
  */
@@ -314,8 +317,16 @@ H5VL_iod_get_type_info_helper(hid_t type_id, H5VL_iod_type_info_t *type_info,
 
             if(H5Tequal(type_id, H5T_STD_REF_OBJ))
                 type_info->ref_type = H5R_OBJECT;
-            else if(H5Tequal(type_id, H5T_STD_REF_DSETREG))
-                type_info->ref_type = H5R_DATASET_REGION;
+            else if(H5Tequal(type_id, H5T_STD_REF_REG))
+                type_info->ref_type = H5R_REGION;
+            else if(H5Tequal(type_id, H5T_STD_REF_ATTR))
+                type_info->ref_type = H5R_ATTR;
+            else if(H5Tequal(type_id, H5T_STD_REF_EXT_OBJ))
+                type_info->ref_type = H5R_EXT_OBJECT;
+            else if(H5Tequal(type_id, H5T_STD_REF_EXT_REG))
+                type_info->ref_type = H5R_EXT_REGION;
+            else if(H5Tequal(type_id, H5T_STD_REF_EXT_ATTR))
+                type_info->ref_type = H5R_EXT_ATTR;
             else
                 assert("Ref Type not Supported for I/O" && 0);
 
@@ -396,7 +407,7 @@ H5VL_iod_get_type_info(hid_t type_id, H5VL_iod_type_info_t *type_info)
     if(0 == (type_info->size = H5Tget_size(type_id)))
         ERROR("H5Tget_size failed");
     if(H5T_REFERENCE == H5Tget_class(type_id))
-        type_info->size = sizeof(href_ff_t);
+        type_info->size = sizeof(href_t);
 
     /* Check for a vl or string type */
     if((found_class = H5Tdetect_class(type_id, H5T_VLEN)) < 0)
@@ -439,7 +450,7 @@ H5VL_iod_get_type_info(hid_t type_id, H5VL_iod_type_info_t *type_info)
 
             /* Update cur_fl_offset */
             if(H5T_REFERENCE == type_info->type_class)
-                cur_fl_offset = type_info->vls[i].offset + sizeof(href_ff_t);
+                cur_fl_offset = type_info->vls[i].offset + sizeof(href_t);
             else
                 cur_fl_offset = type_info->vls[i].offset + 
                     (type_info->vls[i].base_type ? sizeof(hvl_t) : sizeof(char *));
@@ -627,13 +638,13 @@ H5VL_iod_cs_send_helper(char *buf, H5VL_iod_type_info_t *type_info,
                     } /* end if */
                 } /* end if */
                 else if(H5T_REFERENCE == type_info->type_class){
-                    href_ff_t ref = *(href_ff_t *)(buf + (i * type_info->size) + type_info->vls[j].offset);
+                    href_t ref = *(href_t *)(buf + (i * type_info->size) + type_info->vls[j].offset);
 
                     //printf("Send Helper - ref: (%p, %zu) type = %d\n", ref.buf, ref.buf_size, ref.ref_type);
                     /* Add ref buffer size */
                     H5VL_IOD_ARR_ADD(char, *vl_lengths, *vl_lengths_nused, *vl_lengths_nalloc, 256);
                     assert(*vl_lengths_nused + 8 <= *vl_lengths_nalloc);
-                    UINT64ENCODE(&(*vl_lengths)[*vl_lengths_nused], (uint64_t)ref.buf_size);
+                    UINT64ENCODE(&(*vl_lengths)[*vl_lengths_nused], (uint64_t)ref->ref.serial.buf_size);
                     *vl_lengths_nused += 8;
 
                     /* Add segment to segments array */
@@ -654,8 +665,8 @@ H5VL_iod_cs_send_helper(char *buf, H5VL_iod_type_info_t *type_info,
                     } /* end if */
 
                     /* Add segment */
-                    (*addrs)[*num_segments] = ref.buf;
-                    (*sizes)[*num_segments] = ref.buf_size;
+                    (*addrs)[*num_segments] = ref->ref.serial.buf;
+                    (*sizes)[*num_segments] = ref->ref.serial.buf_size;
                     (*num_segments)++;
                 }
                 else {
@@ -923,7 +934,7 @@ H5VL_iod_cs_recv_helper(char *buf, H5VL_iod_type_info_t *type_info,
                     } /* end if */
                 } /* end if */
                 else if(H5T_REFERENCE == type_info->type_class) {
-                    href_ff_t *ref = (href_ff_t *)(buf + (i * type_info->size) + type_info->vls[j].offset);
+                    href_t ref = *(href_t *)(buf + (i * type_info->size) + type_info->vls[j].offset);
                     uint64_t vl_length;
 
                     /* Retrieve buf size */
@@ -931,18 +942,18 @@ H5VL_iod_cs_recv_helper(char *buf, H5VL_iod_type_info_t *type_info,
                         ERROR("vl_lengths array is too short");
                     UINT64DECODE(&vl_lengths[*vl_lengths_loc], vl_length);
                     *vl_lengths_loc += 8;
-                    ref->buf_size = (size_t)vl_length;
+                    ref->ref.serial.buf_size = (size_t)vl_length;
 
                     ref->ref_type = type_info->ref_type;
 
                     /* Allocate buffer for ref buffer */
-                    if(NULL == (ref->buf = malloc(ref->buf_size)))
+                    if(NULL == (ref->ref.serial.buf = malloc(ref->ref.serial.buf_size)))
                         ERROR("failed to allocate ref buffer");
 
                     /* Add malloc'ed buffer to free list, if present */
                     if(free_list) {
                         H5VL_IOD_ARR_ADD(void *, *free_list, *free_list_len, *free_list_nalloc, 64);
-                        (*free_list)[*free_list_len] = ref->buf;
+                        (*free_list)[*free_list_len] = ref->ref.serial.buf;
                         (*free_list_len)++;
                     } /* end if */
 
@@ -964,8 +975,8 @@ H5VL_iod_cs_recv_helper(char *buf, H5VL_iod_type_info_t *type_info,
                     } /* end if */
 
                     /* Add segment */
-                    (*addrs)[*num_segments] = ref->buf;
-                    (*sizes)[*num_segments] = ref->buf_size;
+                    (*addrs)[*num_segments] = ref->ref.serial.buf;
+                    (*sizes)[*num_segments] = ref->ref.serial.buf_size;
                     (*num_segments)++;
                     //printf("Recv Helper - ref: (%p, %zu) type = %d\n", ref->buf, ref->buf_size, ref->ref_type);
                 }

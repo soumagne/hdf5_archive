@@ -26,7 +26,7 @@
 /* Headers */
 /***********/
 #include "H5private.h"      /* Generic Functions */
-#include "H5Qprivate.h"     /* Query */
+#include "H5Qpkg.h"         /* Query */
 #include "H5Eprivate.h"     /* Error handling */
 #include "H5Iprivate.h"     /* IDs */
 #include "H5MMprivate.h"    /* Memory management */
@@ -77,95 +77,6 @@
     (0 == H5T_cmp(type1, native_type, FALSE)) || \
     (0 == H5T_cmp(type2, native_type, FALSE))
 
-/*
- * Singly-linked Tail queue declarations. (from sys/queue.h)
- */
-#define H5Q_QUEUE_HEAD(name, type)                                          \
-struct name {                                                               \
-    struct type *stqh_first;    /* first element */                         \
-    struct type **stqh_last;    /* addr of last next element */             \
-    size_t n_elem;              /* number of elements */                    \
-}
-
-#define H5Q_QUEUE_HEAD_INITIALIZER(head)                                    \
-    { NULL, &(head).stqh_first, 0 }
-
-#define H5Q_QUEUE_ENTRY(type)                                               \
-struct {                                                                    \
-    struct type *stqe_next; /* next element */                              \
-}
-
-/*
- * Singly-linked Tail queue functions.
- */
-#define H5Q_QUEUE_INIT(head) do {                                           \
-    (head)->stqh_first = NULL;                                              \
-    (head)->stqh_last = &(head)->stqh_first;                                \
-    (head)->n_elem = 0;                                                     \
-} while (/*CONSTCOND*/0)
-
-#define H5Q_QUEUE_INSERT_HEAD(head, elm, field) do {                        \
-    if (((elm)->field.stqe_next = (head)->stqh_first) == NULL)              \
-        (head)->stqh_last = &(elm)->field.stqe_next;                        \
-    (head)->stqh_first = (elm);                                             \
-    (head)->n_elem++;                                                       \
-} while (/*CONSTCOND*/0)
-
-#define H5Q_QUEUE_INSERT_TAIL(head, elm, field) do {                        \
-    (elm)->field.stqe_next = NULL;                                          \
-    *(head)->stqh_last = (elm);                                             \
-    (head)->stqh_last = &(elm)->field.stqe_next;                            \
-    (head)->n_elem++;                                                       \
-} while (/*CONSTCOND*/0)
-
-#define H5Q_QUEUE_REMOVE_HEAD(head, field) do {                             \
-    if (((head)->stqh_first = (head)->stqh_first->field.stqe_next) == NULL) { \
-        (head)->stqh_last = &(head)->stqh_first;                            \
-        (head)->n_elem--;                                                   \
-    }                                                                       \
-} while (/*CONSTCOND*/0)
-
-#define H5Q_QUEUE_REMOVE(head, elm, type, field) do {                       \
-    if ((head)->stqh_first == (elm)) {                                      \
-        H5Q_QUEUE_REMOVE_HEAD((head), field);                               \
-    } else {                                                                \
-        struct type *curelm = (head)->stqh_first;                           \
-        while (curelm->field.stqe_next != (elm))                            \
-            curelm = curelm->field.stqe_next;                               \
-        if ((curelm->field.stqe_next =                                      \
-            curelm->field.stqe_next->field.stqe_next) == NULL)              \
-                (head)->stqh_last = &(curelm)->field.stqe_next;             \
-        (head)->n_elem--;                                                   \
-    }                                                                       \
-} while (/*CONSTCOND*/0)
-
-#define H5Q_QUEUE_FOREACH(var, head, field)                                 \
-    for ((var) = ((head)->stqh_first);                                      \
-        (var);                                                              \
-        (var) = ((var)->field.stqe_next))
-
-#define H5Q_QUEUE_CONCAT(head1, head2) do {                                 \
-    if (!H5Q_QUEUE_EMPTY((head2))) {                                        \
-        *(head1)->stqh_last = (head2)->stqh_first;                          \
-        (head1)->stqh_last = (head2)->stqh_last;                            \
-        (head1)->n_elem += (head2)->n_elem;                                 \
-        H5Q_QUEUE_INIT((head2));                                            \
-    }                                                                       \
-} while (/*CONSTCOND*/0)
-
-/*
- * Singly-linked Tail queue access methods.
- */
-#define H5Q_QUEUE_EMPTY(head)       ((head)->stqh_first == NULL)
-#define H5Q_QUEUE_FIRST(head)       ((head)->stqh_first)
-#define H5Q_QUEUE_NEXT(elm, field)  ((elm)->field.stqe_next)
-
-#define H5Q_VIEW_INITIALIZER(view) \
-    {H5Q_QUEUE_HEAD_INITIALIZER(view.reg_refs), H5Q_QUEUE_HEAD_INITIALIZER(view.obj_refs), H5Q_QUEUE_HEAD_INITIALIZER(view.attr_refs)}
-
-#define H5Q_VIEW_REF_NTYPES      3          /* number of reference types */
-#define H5Q_VIEW_CORE_INCREMENT  1024       /* increment for core VFD */
-
 //#define H5Q_DEBUG
 
 #ifdef H5Q_DEBUG
@@ -193,21 +104,6 @@ typedef enum H5Q_match_type_t { /* The different kinds of native types we can ma
     H5Q_NATIVE_FLOAT_MATCH_DOUBLE,
     H5Q_INVALID_MATCH_TYPE
 } H5Q_match_type_t;
-
-typedef struct H5Q_ref_entry_t H5Q_ref_entry_t;
-
-struct H5Q_ref_entry_t {
-    href_t ref;
-    H5Q_QUEUE_ENTRY(H5Q_ref_entry_t) entry;
-};
-
-typedef H5Q_QUEUE_HEAD(H5Q_ref_head_t, H5Q_ref_entry_t) H5Q_ref_head_t;
-
-typedef struct {
-    H5Q_ref_head_t reg_refs;
-    H5Q_ref_head_t obj_refs;
-    H5Q_ref_head_t attr_refs;
-} H5Q_view_t;
 
 typedef struct {
     const H5Q_t *query;
@@ -255,13 +151,6 @@ static herr_t H5Q__apply_object_attr_name(H5A_t *attr, void *udata);
 static herr_t H5Q__apply_object_attr_value(H5A_t *attr, void *udata);
 static herr_t H5Q__apply_object_attr_value_iterate(void *elem, const H5T_t *type,
     unsigned H5_ATTR_UNUSED ndim, const hsize_t H5_ATTR_UNUSED *point, void *udata);
-
-static herr_t H5Q__view_append(H5Q_view_t *view, H5R_type_t ref_type, void *ref);
-static herr_t H5Q__view_combine(H5Q_combine_op_t combine_op, H5Q_view_t *view1, H5Q_view_t *view2,
-    unsigned result1, unsigned result2, H5Q_view_t *view, unsigned *result);
-static herr_t H5Q__view_write(H5G_t *grp, H5Q_view_t *view);
-static herr_t H5Q__view_free(H5Q_view_t *view);
-
 
 static H5_INLINE void
 H5Q__encode_memcpy(unsigned char **buf_ptr, size_t *nalloc, const void *data,
@@ -2505,7 +2394,7 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t
+herr_t
 H5Q__view_append(H5Q_view_t *view, H5R_type_t ref_type, void *ref)
 {
     H5Q_ref_entry_t *ref_entry;
@@ -2550,7 +2439,7 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t
+herr_t
 H5Q__view_combine(H5Q_combine_op_t combine_op, H5Q_view_t *view1, H5Q_view_t *view2,
         unsigned result1, unsigned result2, H5Q_view_t *view, unsigned *result)
 {
@@ -2628,7 +2517,7 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t
+herr_t
 H5Q__view_write(H5G_t *grp, H5Q_view_t *view)
 {
     H5G_loc_t loc;
@@ -2716,7 +2605,7 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t
+herr_t
 H5Q__view_free(H5Q_view_t *view)
 {
     H5Q_ref_head_t *refs[H5Q_VIEW_REF_NTYPES] = { &view->reg_refs, &view->obj_refs,
