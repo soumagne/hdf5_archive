@@ -7791,6 +7791,20 @@ H5VL_iod_object_get(void H5_ATTR_UNUSED *obj, H5VL_loc_params_t H5_ATTR_UNUSED l
                     HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to determine object path")
                 break;
             }
+        /* H5Rget_attr_name */
+        case H5VL_REF_GET_ATTR_NAME:
+            {
+                ssize_t     *ret       = va_arg (arguments, ssize_t *);
+                char        *name      = va_arg (arguments, char *);
+                size_t      size       = va_arg (arguments, size_t);
+                H5R_type_t  ref_type   = va_arg (arguments, H5R_type_t);
+                void        *ref       = va_arg (arguments, void *);
+
+                /* Get name */
+                if((*ret = H5R__get_attr_name(NULL, ref, name, size)) < 0)
+                    HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to determine object path")
+                break;
+            }
         case H5VL_REF_GET_TYPE:
         default:
             HGOTO_ERROR(H5E_VOL, H5E_CANTGET, FAIL, "can't get this type of information from object")
