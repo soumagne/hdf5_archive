@@ -1306,20 +1306,14 @@ done:
 H5S_t *
 H5R__get_region(H5F_t *file, hid_t dxpl_id, href_t _ref)
 {
-    H5O_loc_t oloc;             /* Object location */
     const uint8_t *p = NULL;    /* Pointer to OID to store */
     struct href_t *ref = (struct href_t *) _ref; /* Reference */
     H5S_t *ret_value = NULL;
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    HDassert(file);
     HDassert(ref);
     HDassert((ref->ref_type == H5R_REGION) || (ref->ref_type == H5R_EXT_REGION));
-
-    /* Initialize the object location */
-    H5O_loc_reset(&oloc);
-    oloc.file = file;
 
     /* Point to reference buffer now */
     p = (const uint8_t *)ref->ref.serial.buf;
@@ -1345,6 +1339,14 @@ H5R__get_region(H5F_t *file, hid_t dxpl_id, href_t _ref)
         if (NULL == (ret_value = H5S_decode(&p)))
             HGOTO_ERROR(H5E_REFERENCE, H5E_CANTDECODE, NULL, "can't deserialize selection")
     } else {
+        H5O_loc_t oloc; /* Object location */
+
+        HDassert(file);
+
+        /* Initialize the object location */
+        H5O_loc_reset(&oloc);
+        oloc.file = file;
+
         /* Get the object oid for the dataset */
         H5F_addr_decode(oloc.file, &p, &(oloc.addr));
 
@@ -1742,12 +1744,7 @@ H5R__get_obj_name(H5F_t *f, hid_t lapl_id, hid_t dxpl_id, href_t _ref,
     FUNC_ENTER_NOAPI_NOINIT
 
     /* Check args */
-    HDassert(f);
     HDassert(ref);
-
-    /* Initialize the object location */
-    H5O_loc_reset(&oloc);
-    oloc.file = f;
 
     /* Point to reference buffer now */
     p = (const uint8_t *)ref->ref.serial.buf;
@@ -1755,12 +1752,26 @@ H5R__get_obj_name(H5F_t *f, hid_t lapl_id, hid_t dxpl_id, href_t _ref,
     /* Get address for reference */
     switch(ref->ref_type) {
         case H5R_OBJECT:
+        {
+            HDassert(f);
+
+            /* Initialize the object location */
+            H5O_loc_reset(&oloc);
+            oloc.file = f;
+
             oloc.addr = ref->ref.addr;
+        }
             break;
 
         case H5R_REGION:
         case H5R_ATTR:
         {
+            HDassert(f);
+
+            /* Initialize the object location */
+            H5O_loc_reset(&oloc);
+            oloc.file = f;
+
             /* Get the object oid for the dataset */
             H5F_addr_decode(oloc.file, &p, &(oloc.addr));
         } /* end case */
