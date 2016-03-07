@@ -23,6 +23,7 @@
 
 #define H5P_FRIEND		/*suppress error about including H5Ppkg	  */
 #define H5O_FRIEND		/*suppress error about including H5Opkg	  */
+#define H5R_FRIEND              /*suppress error about including H5Rpkg   */
 
 
 #include "H5private.h"		/* Generic Functions			*/
@@ -35,6 +36,7 @@
 #include "H5Opkg.h"             /* Object headers			*/
 #include "H5Pprivate.h"		/* Property lists			*/
 #include "H5Ppkg.h"		/* Property lists			*/
+#include "H5Rpkg.h"             /* References                           */
 #include "H5Sprivate.h"		/* Dataspaces		  		*/
 #include "H5VLprivate.h"	/* VOL plugins				*/
 #include "H5VLiod_client.h"     /* Client IOD helper			*/
@@ -187,6 +189,8 @@ static herr_t H5VL_iod_link_specific(void *_obj, H5VL_loc_params_t loc_params, H
 
 /* Object callbacks */
 static void *H5VL_iod_object_open(void *obj, H5VL_loc_params_t loc_params, H5I_type_t *opened_type, hid_t dxpl_id, void **req);
+static herr_t H5VL_iod_object_get(void *obj, H5VL_loc_params_t loc_params,
+    H5VL_object_get_t get_type, hid_t dxpl_id, void H5_ATTR_UNUSED **req, va_list arguments);
 static herr_t H5VL_iod_object_specific(void *_obj, H5VL_loc_params_t loc_params, H5VL_object_specific_t specific_type, 
                                        hid_t dxpl_id, void **req, va_list arguments);
 static herr_t H5VL_iod_object_optional(void *_obj, hid_t dxpl_id, void **req, va_list arguments);
@@ -272,7 +276,7 @@ static H5VL_class_t H5VL_iod_g = {
     {                                           /* object_cls */
         H5VL_iod_object_open,                   /* open */
         NULL,                                   /* copy */
-        NULL,                                   /* get */
+        H5VL_iod_object_get,                    /* get */
         H5VL_iod_object_specific,               /* specific */
         H5VL_iod_object_optional                /* optional */
     },
@@ -7745,6 +7749,55 @@ done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5VL_iod_object_copy() */
 #endif
+
+static herr_t
+H5VL_iod_object_get(void H5_ATTR_UNUSED *obj, H5VL_loc_params_t H5_ATTR_UNUSED loc_params,
+    H5VL_object_get_t get_type, hid_t dxpl_id, void H5_ATTR_UNUSED **req,
+    va_list arguments)
+{
+    herr_t      ret_value = SUCCEED;    /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    switch (get_type) {
+        /* H5Rget_region */
+        case H5VL_REF_GET_REGION:
+            {
+                hid_t       *ret     =  va_arg (arguments, hid_t *);
+                void        *ref     =  va_arg (arguments, void *);
+                H5S_t       *space = NULL;    /* Dataspace object */
+
+                /* Get the dataspace with the correct region selected */
+                if((space = H5R__get_region(NULL, dxpl_id, ref)) == NULL)
+                    HGOTO_ERROR(H5E_REFERENCE, H5E_CANTCREATE, FAIL, "unable to create dataspace")
+
+                /* Atomize */
+                if((*ret = H5I_register (H5I_DATASPACE, space, TRUE)) < 0)
+                    HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register dataspace atom")
+
+                break;
+            }
+        /* H5Rget_name */
+        case H5VL_REF_GET_NAME:
+            {
+                ssize_t     *ret       = va_arg (arguments, ssize_t *);
+                char        *name      = va_arg (arguments, char *);
+                size_t      size       = va_arg (arguments, size_t);
+                H5R_type_t  ref_type   = va_arg (arguments, H5R_type_t);
+                void        *ref       = va_arg (arguments, void *);
+
+                /* Get name */
+                if((*ret = H5R__get_obj_name(NULL, H5P_DEFAULT, dxpl_id, ref, name, size)) < 0)
+                    HGOTO_ERROR(H5E_REFERENCE, H5E_CANTINIT, FAIL, "unable to determine object path")
+                break;
+            }
+        case H5VL_REF_GET_TYPE:
+        default:
+            HGOTO_ERROR(H5E_VOL, H5E_CANTGET, FAIL, "can't get this type of information from object")
+    }
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5VL_iod_object_get() */
 
 
 /*-------------------------------------------------------------------------
