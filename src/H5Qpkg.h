@@ -149,7 +149,7 @@ typedef struct {
 /* Package Private Prototypes */
 /******************************/
 
-herr_t H5Q__view_append(H5Q_view_t *view, H5R_type_t ref_type, void *ref);
+herr_t H5Q__view_append(H5Q_view_t *view, H5R_type_t ref_type, href_t ref);
 herr_t H5Q__view_combine(H5Q_combine_op_t combine_op, H5Q_view_t *view1, H5Q_view_t *view2,
     unsigned result1, unsigned result2, H5Q_view_t *view, unsigned *result);
 herr_t H5Q__view_write(H5G_t *grp, H5Q_view_t *view);

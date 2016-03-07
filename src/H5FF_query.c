@@ -458,7 +458,7 @@ H5Q__apply_object_link_ff(hid_t loc_id, const char *name,
 
     if (NULL == (ref = H5R_create_ext_object(file_name, name)))
         HGOTO_ERROR(H5E_DATASET, H5E_CANTCREATE, FAIL, "can't create object reference");
-    if (FAIL == H5Q__view_append(args->view, H5R_EXT_OBJECT, &ref))
+    if (FAIL == H5Q__view_append(args->view, H5R_EXT_OBJECT, ref))
         HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
 
 done:
@@ -527,7 +527,7 @@ H5Q__apply_object_data_ff(hid_t loc_id, const char *name,
 
     if (NULL == (ref = H5R_create_ext_region(file_name, name, space)))
         HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't get buffer size for region reference");
-    if (FAIL == H5Q__view_append(args->view, H5R_EXT_REGION, &ref))
+    if (FAIL == H5Q__view_append(args->view, H5R_EXT_REGION, ref))
         HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append region reference to view");
 
 done:
@@ -651,7 +651,6 @@ static herr_t
 H5Q__apply_object_attr_name_ff(const char *attr_name, void *udata)
 {
     H5Q_apply_attr_arg_t *args = (H5Q_apply_attr_arg_t *) udata;
-    char *name = NULL;
     href_t ref;
     hbool_t result = FALSE;
     herr_t ret_value = SUCCEED; /* Return value */
@@ -671,9 +670,9 @@ H5Q__apply_object_attr_name_ff(const char *attr_name, void *udata)
     H5Q_LOG_DEBUG("Match attribute name: %s\n", attr_name);
 
     /* Keep attribute reference */
-    if (NULL == (ref = H5R_create_ext_attr(args->filename, args->loc_name, (const char *) name)))
+    if (NULL == (ref = H5R_create_ext_attr(args->filename, args->loc_name, attr_name)))
         HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't get buffer size for attribute reference");
-    if (FAIL == H5Q__view_append(args->apply_args->view, H5R_EXT_ATTR, &ref))
+    if (FAIL == H5Q__view_append(args->apply_args->view, H5R_EXT_ATTR, ref))
         HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append attribute reference to view");
 
 done:
@@ -749,7 +748,7 @@ H5Q__apply_object_attr_value_ff(hid_t loc_id, const char *attr_name,
     /* Keep attribute reference */
     if (NULL == (ref = H5R_create_ext_attr(args->filename, args->loc_name, attr_name)))
         HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't get buffer size for attribute reference");
-    if (FAIL == H5Q__view_append(args->apply_args->view, H5R_EXT_ATTR, &ref))
+    if (FAIL == H5Q__view_append(args->apply_args->view, H5R_EXT_ATTR, ref))
         HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append attribute reference to view");
 
 done:

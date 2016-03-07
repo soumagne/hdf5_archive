@@ -2395,7 +2395,7 @@ done:
  *-------------------------------------------------------------------------
  */
 herr_t
-H5Q__view_append(H5Q_view_t *view, H5R_type_t ref_type, void *ref)
+H5Q__view_append(H5Q_view_t *view, H5R_type_t ref_type, href_t ref)
 {
     H5Q_ref_entry_t *ref_entry;
     herr_t ret_value = SUCCEED; /* Return value */
