@@ -475,23 +475,34 @@ H5Rget_object_ff(hid_t loc_id, hid_t H5_ATTR_UNUSED oapl_id, href_t _ref,
     }
     else if(ref->ref_type == H5R_EXT_OBJECT || ref->ref_type == H5R_EXT_REGION ||
             ref->ref_type == H5R_EXT_ATTR) {
-        size_t name_size;
         hid_t lapl_id = H5P_LINK_ACCESS_DEFAULT;
         hid_t dxpl_id = H5P_DATASET_XFER_DEFAULT;
         H5P_genplist_t *plist;
         H5I_type_t opened_type;
         H5VL_object_t *opened_obj = NULL;
         H5VL_loc_params_t loc_params;
+        size_t filename_len; /* Length of the file name */
+        size_t pathname_len; /* Length of the obj path name */
 
-        /* retrieve the pathname of the object to dereference */
-        p = (uint8_t *)ref->ref.serial.buf;
+        /* Get the file name length */
+        UINT16DECODE(p, filename_len);
 
-        UINT64DECODE(p, name_size);
-        p += name_size;
-        UINT64DECODE(p, name_size);
-        pathname = (char *)HDmalloc(name_size);
-        HDmemcpy(pathname, p, name_size);
-        pathname[name_size] = '\0';
+        /* Skip the file name */
+        p += filename_len;
+
+        /* Get the path name length */
+        UINT16DECODE(p, pathname_len);
+
+        /* Allocate space for the path name */
+        if(NULL == (pathname = (char *)H5MM_malloc(pathname_len + 1)))
+            HGOTO_ERROR(H5E_REFERENCE, H5E_CANTALLOC, FAIL, "memory allocation failed")
+
+        /* Get the path name */
+        HDmemcpy(pathname, p, pathname_len);
+        pathname[pathname_len] = '\0';
+
+        /* Skip the path name */
+        p += pathname_len;
 
         loc_params.type = H5VL_OBJECT_BY_NAME;
         loc_params.loc_data.loc_by_name.name = pathname;
@@ -517,10 +528,8 @@ H5Rget_object_ff(hid_t loc_id, hid_t H5_ATTR_UNUSED oapl_id, href_t _ref,
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid reference type");
 
 done:
-    if(pathname) {
-        HDfree(pathname);
-        pathname = NULL;
-    }
+    H5MM_xfree(pathname);
+
     FUNC_LEAVE_API(ret_value)
 } /* H5Rdereference_ff */
 
