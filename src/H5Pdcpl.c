@@ -3782,3 +3782,4 @@ H5Pget_index_plugin(hid_t plist_id, unsigned *plugin_id/*out*/)
 done:
     FUNC_LEAVE_API(ret_value)
 } /* end H5Pget_index_plugin() */
+

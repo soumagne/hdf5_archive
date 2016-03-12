@@ -37,11 +37,12 @@
 #include "H5Eprivate.h"     /* Error handling       */
 #include "H5Iprivate.h"     /* IDs                  */
 #include "H5Sprivate.h"     /* Dataspaces           */
+#ifdef H5_HAVE_EFF
 #include "H5FFprivate.h"    /* Fast Forward routines*/
+#endif
 #include "H5Xprivate.h"     /* Index                */
 #include "H5Ppkg.h"         /* Property lists       */
 
-#ifdef H5_HAVE_INDEXING
 
 /****************/
 /* Local Macros */
@@ -76,7 +77,7 @@ const H5P_libclass_t H5P_CLS_XACC[1] = {{
     H5P_TYPE_INDEX_ACCESS,      /* Class type                   */
     &H5P_CLS_LINK_ACCESS_g,     /* Parent class                 */
     &H5P_CLS_INDEX_ACCESS_g,    /* Pointer to class             */
-    &H5P_CLS_INDEX_ACCESS_ID_g, /* Pointer to class ID       */
+    &H5P_CLS_INDEX_ACCESS_ID_g, /* Pointer to class ID          */
     &H5P_LST_INDEX_ACCESS_ID_g, /* Pointer to default property list ID */
     H5P__xacc_reg_prop,         /* Default property registration routine */
     NULL,                       /* Class creation callback      */
@@ -109,12 +110,15 @@ const H5P_libclass_t H5P_CLS_XACC[1] = {{
 static herr_t
 H5P__xacc_reg_prop(H5P_genclass_t *pclass)
 {
+#ifdef H5_HAVE_EFF
     hid_t trans_id = FAIL;
     hid_t context_id = FAIL;
+#endif
     herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_NOAPI(FAIL)
 
+#ifdef H5_HAVE_EFF
     /* Register the transaction ID property*/
     if(H5P_register_real(pclass, H5VL_TRANS_ID, sizeof(hid_t), &trans_id,
                          NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL) < 0)
@@ -124,8 +128,8 @@ H5P__xacc_reg_prop(H5P_genclass_t *pclass)
     if(H5P_register_real(pclass, H5VL_CONTEXT_ID, sizeof(hid_t), &context_id,
                          NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL) < 0)
         HGOTO_ERROR(H5E_PLIST, H5E_CANTINSERT, FAIL, "can't insert property into class")
+#endif
+
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5P__xacc_reg_prop() */
-
-#endif /* H5_HAVE_INDEXING */

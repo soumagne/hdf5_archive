@@ -487,11 +487,9 @@ H5VL_AXE_TASK_CB(H5VL_iod_server_dset_write, dset_io_in_t)
 H5VL_AXE_TASK_CB(H5VL_iod_server_dset_multi_write, dset_io_in_t)
 H5VL_AXE_TASK_CB(H5VL_iod_server_dset_set_extent, dset_set_extent_in_t)
 H5VL_AXE_TASK_CB(H5VL_iod_server_dset_close, dset_close_in_t)
-#ifdef H5_HAVE_INDEXING
 H5VL_AXE_TASK_CB(H5VL_iod_server_dset_set_index_info, dset_set_index_info_in_t)
 H5VL_AXE_TASK_CB(H5VL_iod_server_dset_get_index_info, dset_get_index_info_in_t)
 H5VL_AXE_TASK_CB(H5VL_iod_server_dset_remove_index_info, dset_rm_index_info_in_t)
-#endif
 H5VL_AXE_TASK_CB(H5VL_iod_server_dtype_commit, dtype_commit_in_t)
 H5VL_AXE_TASK_CB(H5VL_iod_server_dtype_open, dtype_open_in_t)
 H5VL_AXE_TASK_CB(H5VL_iod_server_dtype_close, dtype_close_in_t)

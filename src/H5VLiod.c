@@ -129,11 +129,9 @@ hg_id_t H5VL_PREFETCH_ID;
 hg_id_t H5VL_EVICT_ID;
 hg_id_t H5VL_CANCEL_OP_ID;
 hg_id_t H5VL_VIEW_CREATE_ID;
-#ifdef H5_HAVE_INDEXING
 hg_id_t H5VL_DSET_SET_INDEX_INFO_ID;
 hg_id_t H5VL_DSET_GET_INDEX_INFO_ID;
 hg_id_t H5VL_DSET_RM_INDEX_INFO_ID;
-#endif
 
 /* Prototypes */
 static void *H5VL_iod_fapl_copy(const void *_old_fa);
@@ -2192,10 +2190,8 @@ H5VL_iod_dataset_create(void *_obj, H5VL_loc_params_t H5_ATTR_UNUSED loc_params,
     dset->remote_dset.iod_oh.rd_oh.cookie = IOD_OH_UNDEFINED;
     dset->remote_dset.iod_oh.wr_oh.cookie = IOD_OH_UNDEFINED;
     dset->remote_dset.iod_id = IOD_OBJ_INVALID;
-#ifdef H5_HAVE_INDEXING
     dset->idx_plugin_id = 0;
     dset->idx_handle = NULL;
-#endif
 
     /* Copy virtual storage if the dataset is virtual */
     if(layout.type == H5D_VIRTUAL) {
@@ -2394,10 +2390,8 @@ H5VL_iod_dataset_open(void *_obj, H5VL_loc_params_t H5_ATTR_UNUSED loc_params, c
     dset->remote_dset.dcpl_id = -1;
     dset->remote_dset.type_id = -1;
     dset->remote_dset.space_id = -1;
-#ifdef H5_HAVE_INDEXING
     dset->idx_plugin_id = 0;
     dset->idx_handle = NULL;
-#endif
 
     /* set the input structure for the HG encode routine */
     input.coh = obj->file->remote_file.coh;
@@ -3111,15 +3105,15 @@ H5VL_iod_dataset_write(void *_dset, hid_t mem_type_id, hid_t mem_space_id,
 
         /* Fill in rest of info structure */
         vds_info->status = status;
-#ifdef H5_HAVE_INDEXING
-        /* setup extra info required for the index post_update operation */
-        vds_info->dset = dset;
-        vds_info->idx_handle = dset->idx_handle;
-        vds_info->idx_plugin_id = dset->idx_plugin_id;
-        vds_info->buf = buf;
-        vds_info->dataspace_id = file_space_id;
-        vds_info->trans_id = trans_id;
-#endif
+//#ifdef H5_HAVE_INDEXING
+//        /* setup extra info required for the index post_update operation */
+//        vds_info->dset = dset;
+//        vds_info->idx_handle = dset->idx_handle;
+//        vds_info->idx_plugin_id = dset->idx_plugin_id;
+//        vds_info->buf = buf;
+//        vds_info->dataspace_id = file_space_id;
+//        vds_info->trans_id = trans_id;
+//#endif
 
         if(H5VL__iod_create_and_forward(H5VL_DSET_MULTI_WRITE_ID, HG_DSET_MULTI_WRITE, 
                                         (H5VL_iod_object_t *)dset, 0, num_parents, parent_reqs,
@@ -3204,15 +3198,15 @@ H5VL_iod_dataset_write(void *_dset, hid_t mem_type_id, hid_t mem_space_id,
         info->bulk_handle = bulk_handle;
         info->vl_len_bulk_handle = vl_len_bulk_handle;
         info->vl_lengths = vl_lengths;
-#ifdef H5_HAVE_INDEXING
-        /* setup extra info required for the index post_update operation */
-        info->dset = dset;
-        info->idx_handle = dset->idx_handle;
-        info->idx_plugin_id = dset->idx_plugin_id;
-        info->buf = buf;
-        info->dataspace_id = file_space_id;
-        info->trans_id = trans_id;
-#endif
+//#ifdef H5_HAVE_INDEXING
+//        /* setup extra info required for the index post_update operation */
+//        info->dset = dset;
+//        info->idx_handle = dset->idx_handle;
+//        info->idx_plugin_id = dset->idx_plugin_id;
+//        info->buf = buf;
+//        info->dataspace_id = file_space_id;
+//        info->trans_id = trans_id;
+//#endif
 
         if(H5VL__iod_create_and_forward(H5VL_DSET_WRITE_ID, HG_DSET_WRITE, 
                                         (H5VL_iod_object_t *)dset, 0, num_parents, parent_reqs,
@@ -10444,7 +10438,6 @@ done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5VL_iod_view_create() */
 
-#ifdef H5_HAVE_INDEXING
 /*-------------------------------------------------------------------------
  * Function:    H5VL_iod_dataset_set_index
  *
@@ -10768,8 +10761,6 @@ H5VL_iod_dataset_remove_index_info(void *_dset, hid_t trans_id, void **req)
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5VL_iod_dataset_remove_index_info() */
-
-#endif /* H5_HAVE_INDEXING */
 
 /*-------------------------------------------------------------------------
  * Function:    H5VL_iod_get_filename

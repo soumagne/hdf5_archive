@@ -325,6 +325,7 @@ H5X_dummy_open(hid_t dataset_id, hid_t H5_ATTR_UNUSED xapl_id, size_t metadata_s
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, NULL, "NULL metadata size");
     if (!metadata)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, NULL, "NULL metadata");
+
     if (NULL == (dummy = (H5X_dummy_t *) H5MM_malloc(sizeof(H5X_dummy_t))))
         HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, NULL, "can't allocate dummy struct");
 
@@ -465,7 +466,7 @@ H5X__dummy_get_query_data_cb(void *elem, hid_t type_id, unsigned H5_ATTR_UNUSED 
     FUNC_ENTER_NOAPI_NOINIT
 
     /* Apply the query */
-    if (H5Qapply_singleton(udata->query_id, &result, type_id, elem) < 0)
+    if (H5Qapply_atom(udata->query_id, &result, type_id, elem) < 0)
         HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query to data element");
 
     /* Initialize count */

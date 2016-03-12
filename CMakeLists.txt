@@ -486,7 +486,33 @@ if (H5_HAVE_PARALLEL)
   endif (MPI_C_LINK_FLAGS)
 endif (H5_HAVE_PARALLEL)
 
-set (DEFAULT_API_VERSION "v110")
+#-----------------------------------------------------------------------------
+# Option to use ALACRITY
+#-----------------------------------------------------------------------------
+option (HDF5_ENABLE_ALACRITY_SUPPORT "Enable ALACRITY for indexing." OFF)
+if (HDF5_ENABLE_ALACRITY_SUPPORT)
+  find_package (ALACRITY)
+  if (ALACRITY_FOUND)
+    set (H5_HAVE_ALACRITY 1)
+    include_directories (${ALACRITY_INCLUDE_DIR})
+    set (LINK_LIBS ${LINK_LIBS} ${ALACRITY_LIBRARIES})
+    set (LINK_SHARED_LIBS ${LINK_SHARED_LIBS} ${ALACRITY_LIBRARIES})
+  endif (ALACRITY_FOUND)
+endif (HDF5_ENABLE_ALACRITY_SUPPORT)
+
+#-----------------------------------------------------------------------------
+# Option to use FastBit
+#-----------------------------------------------------------------------------
+option (HDF5_ENABLE_FASTBIT_SUPPORT "Enable FastBit for indexing." OFF)
+if (HDF5_ENABLE_FASTBIT_SUPPORT)
+  find_package (FASTBIT)
+  if (FASTBIT_FOUND)
+    set (H5_HAVE_FASTBIT 1)
+    include_directories (${FASTBIT_INCLUDE_DIR})
+    set (LINK_LIBS ${LINK_LIBS} ${FASTBIT_LIBRARIES})
+    set (LINK_SHARED_LIBS ${LINK_SHARED_LIBS} ${FASTBIT_LIBRARIES})
+  endif (FASTBIT_FOUND)
+endif (HDF5_ENABLE_FASTBIT_SUPPORT)
 
 #-----------------------------------------------------------------------------
 # Option to Enable EFF
@@ -551,28 +577,10 @@ if (HDF5_ENABLE_PARALLEL)
       endif (PYTHON_NUMPY_FOUND)
     endif (HDF5_ENABLE_PYTHON)
 
-#    OPTION (HDF5_ENABLE_INDEXING "Enable support for Indexing." OFF)
-#    IF (HDF5_ENABLE_INDEXING)
-#      SET (H5_HAVE_INDEXING 1)
-      # ALACRITY
-#      FIND_PACKAGE (ALACRITY)
-#      IF (ALACRITY_FOUND)
-#        SET (H5_HAVE_ALACRITY 1)
-#        INCLUDE_DIRECTORIES (${ALACRITY_INCLUDE_DIR})
-#        SET (LINK_LIBS ${LINK_LIBS} ${ALACRITY_LIBRARIES})
-#      ENDIF (ALACRITY_FOUND)
-      # FastBit
-#      FIND_PACKAGE (FASTBIT)
-#      IF (FASTBIT_FOUND)
-#        SET (H5_HAVE_FASTBIT 1)
-#        INCLUDE_DIRECTORIES (${FASTBIT_INCLUDE_DIR})
-#        SET (LINK_LIBS ${LINK_LIBS} ${FASTBIT_LIBRARIES})
-#      ENDIF (FASTBIT_FOUND)
-#    ENDIF (HDF5_ENABLE_INDEXING)
-
   endif (HDF5_ENABLE_EFF)
 endif (HDF5_ENABLE_PARALLEL)
 
+set (DEFAULT_API_VERSION "v110")
 #-----------------------------------------------------------------------------
 # Option to use 1.6.x API
 #-----------------------------------------------------------------------------

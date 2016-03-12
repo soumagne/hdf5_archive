@@ -101,11 +101,9 @@ extern hg_id_t H5VL_PREFETCH_ID;
 extern hg_id_t H5VL_EVICT_ID;
 extern hg_id_t H5VL_CANCEL_OP_ID;
 extern hg_id_t H5VL_VIEW_CREATE_ID;
-#ifdef H5_HAVE_INDEXING
 extern hg_id_t H5VL_DSET_SET_INDEX_INFO_ID;
 extern hg_id_t H5VL_DSET_GET_INDEX_INFO_ID;
 extern hg_id_t H5VL_DSET_RM_INDEX_INFO_ID;
-#endif
 
 /* Structure for a span of fixed-length data in a type */
  typedef struct H5VL_iod_fl_span_t {
@@ -238,11 +236,9 @@ H5_DLL herr_t EFF_setup_coresident(MPI_Comm comm, MPI_Info info);
 H5_DLL herr_t EFF_terminate_coresident(void);
 H5_DLL void EFF__mercury_register_callbacks(void);
 
-#ifdef H5_HAVE_INDEXING
 H5_DLL int H5VL_iod_server_dset_set_index_info(hg_handle_t handle);
 H5_DLL int H5VL_iod_server_dset_get_index_info(hg_handle_t handle);
 H5_DLL int H5VL_iod_server_dset_remove_index_info(hg_handle_t handle);
-#endif
 
 H5_DLL int H5VL_iod_server_eff_init(hg_handle_t handle);
 H5_DLL int H5VL_iod_server_eff_finalize(hg_handle_t handle);
@@ -973,8 +969,6 @@ MERCURY_GEN_PROC(view_create_out_t,
                  ((attr_info_t)(attr_info))
                  ((region_info_t)(region_info)))
 
-#ifdef H5_HAVE_INDEXING
-
 MERCURY_GEN_PROC(dset_set_index_info_in_t,
                  ((axe_t)(axe_info))
                  ((iod_handle_t)(coh))
@@ -1001,6 +995,5 @@ MERCURY_GEN_PROC(dset_rm_index_info_in_t,
                  ((iod_handle_t)(coh))
                  ((iod_obj_id_t)(mdkv_id)))
 
-#endif /* H5_HAVE_INDEXING */
 #endif /* H5_HAVE_EFF */
 #endif /* _H5VLiod_common_H */

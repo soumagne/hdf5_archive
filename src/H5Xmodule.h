@@ -13,8 +13,8 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 /*
- * Programmer:	Mohamad Chaarawi
- *              Ocotber 2015
+ * Programmer:	Quincey Koziol <koziol@hdfgroup.org>
+ *		Saturday, September 12, 2015
  *
  * Purpose:	This file contains declarations which define macros for the
  *		H5X package.  Including this header means that the source file
@@ -23,12 +23,13 @@
 #ifndef _H5Xmodule_H
 #define _H5Xmodule_H
 
-/* Define the proper control macros for the generic FUNC_ENTER/LEAXE and error
+/* Define the proper control macros for the generic FUNC_ENTER/LEAVE and error
  *      reporting macros.
  */
 #define H5X_MODULE
 #define H5_MY_PKG       H5X
-#define H5_MY_PKG_ERR   H5E_PLINE
+#define H5_MY_PKG_ERR   H5E_INDEX
 #define H5_MY_PKG_INIT  YES
 
 #endif /* _H5Xmodule_H */
+

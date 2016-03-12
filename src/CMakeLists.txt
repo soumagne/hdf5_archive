@@ -505,6 +505,7 @@ set (H5Q_SRCS
 )
 
 set (H5Q_HDRS
+    ${HDF5_SRC_DIR}/H5Qpkg.h
     ${HDF5_SRC_DIR}/H5Qpublic.h
 )
 IDE_GENERATED_PROPERTIES ("H5Q" "${H5Q_HDRS}" "${H5Q_SRCS}" )
@@ -653,36 +654,15 @@ IF (HDF5_ENABLE_EFF)
         ${HDF5_SRC_DIR}/H5FF.c
         ${HDF5_SRC_DIR}/H5FF_attr.c
         ${HDF5_SRC_DIR}/H5FF_obj.c
+        ${HDF5_SRC_DIR}/H5FF_index.c
         ${HDF5_SRC_DIR}/H5FF_query.c
         ${HDF5_SRC_DIR}/H5FF_ref.c
         ${HDF5_SRC_DIR}/H5M.c
         ${HDF5_SRC_DIR}/H5RC.c
         ${HDF5_SRC_DIR}/H5TR.c
         ${HDF5_SRC_DIR}/H5V.c
+#        ${HDF5_SRC_DIR}/H5Xdummy_ff.c
     )
-    IF (HDF5_ENABLE_INDEXING)
-      set (H5FF_SRCS
-        ${H5FF_SRCS}
-        ${HDF5_SRC_DIR}/H5X.c
-        ${HDF5_SRC_DIR}/H5Xdummy.c
-        ${HDF5_SRC_DIR}/H5Pxapl.c
-        ${HDF5_SRC_DIR}/H5Pxcpl.c
-        ${HDF5_SRC_DIR}/H5Pxxpl.c
-        ${HDF5_SRC_DIR}/H5VLiod_index.c
-      )
-      IF (ALACRITY_FOUND)
-        set (H5FF_SRCS
-          ${H5FF_SRCS}
-          ${HDF5_SRC_DIR}/H5Xalacrity.c
-        )
-      ENDIF (ALACRITY_FOUND)
-      IF (FASTBIT_FOUND)
-        set (H5FF_SRCS
-          ${H5FF_SRCS}
-          ${HDF5_SRC_DIR}/H5Xfastbit.c
-        )
-      ENDIF (FASTBIT_FOUND)      
-    ENDIF (HDF5_ENABLE_INDEXING)
     set (H5FF_HDRS
         ${HDF5_SRC_DIR}/H5ASpublic.h
         ${HDF5_SRC_DIR}/H5FFpublic.h
@@ -692,12 +672,6 @@ IF (HDF5_ENABLE_EFF)
         ${HDF5_SRC_DIR}/H5TRpublic.h
         ${HDF5_SRC_DIR}/H5Vpublic.h
     )
-    IF (HDF5_ENABLE_INDEXING)
-      set (H5FF_HDRS
-        ${H5FF_HDRS}
-        ${HDF5_SRC_DIR}/H5Xpublic.h
-      )
-    ENDIF (HDF5_ENABLE_INDEXING)
     IDE_GENERATED_PROPERTIES ("H5FF" "${H5FF_HDRS}" "${H5FF_SRCS}" )
     set (H5VL_SRCS
         ${H5VL_SRCS}
@@ -719,6 +693,7 @@ IF (HDF5_ENABLE_EFF)
         ${HDF5_SRC_DIR}/H5VLiod_encdec.c
         ${HDF5_SRC_DIR}/H5VLiod_view.c
         ${HDF5_SRC_DIR}/H5VLiod_analysis.c
+        ${HDF5_SRC_DIR}/H5VLiod_index.c
     )
     set (H5VL_HDRS
         ${H5VL_HDRS}
@@ -735,6 +710,29 @@ set (H5WB_HDRS
 )
 IDE_GENERATED_PROPERTIES ("H5WB" "${H5WB_HDRS}" "${H5WB_SRCS}" )
 
+set (H5X_SRCS
+    ${HDF5_SRC_DIR}/H5X.c
+    ${HDF5_SRC_DIR}/H5Xdummy.c
+    ${HDF5_SRC_DIR}/H5Pxapl.c
+    ${HDF5_SRC_DIR}/H5Pxcpl.c
+    ${HDF5_SRC_DIR}/H5Pxxpl.c
+)
+if (ALACRITY_FOUND)
+  set (H5X_SRCS
+      ${H5X_SRCS}
+#      ${HDF5_SRC_DIR}/H5Xalacrity.c
+  )
+endif (ALACRITY_FOUND)
+if (FASTBIT_FOUND)
+  set (H5X_SRCS
+      ${H5X_SRCS}
+#      ${HDF5_SRC_DIR}/H5Xfastbit.c
+  )
+endif (FASTBIT_FOUND)
+set (H5X_HDRS
+    ${HDF5_SRC_DIR}/H5Xpublic.h
+)
+IDE_GENERATED_PROPERTIES ("H5X" "${H5X_HDRS}" "${H5X_SRCS}" )
 
 set (H5Z_SRCS
     ${HDF5_SRC_DIR}/H5Z.c
@@ -802,6 +800,7 @@ set (common_SRCS
     ${H5VM_SRCS}
     ${H5VL_SRCS}
     ${H5WB_SRCS}
+    ${H5X_SRCS}
     ${H5Z_SRCS}
 )
 
@@ -838,6 +837,7 @@ set (H5_PUBLIC_HEADERS
     ${H5SM_HDRS}
     ${H5T_HDRS}
     ${H5VL_HDRS}
+    ${H5X_HDRS}
     ${H5Z_HDRS}
 )
 
@@ -885,6 +885,7 @@ set (H5_PRIVATE_HEADERS
     ${HDF5_SRC_DIR}/H5VMprivate.h
     ${HDF5_SRC_DIR}/H5VLprivate.h
     ${HDF5_SRC_DIR}/H5WBprivate.h
+    ${HDF5_SRC_DIR}/H5Xprivate.h
     ${HDF5_SRC_DIR}/H5Zprivate.h
     ${HDF5_SRC_DIR}/H5win32defs.h
 )
@@ -894,12 +895,6 @@ IF (HDF5_ENABLE_EFF)
     ${HDF5_SRC_DIR}/H5ASprivate.h
     ${HDF5_SRC_DIR}/H5FFprivate.h
   )
-  IF (HDF5_ENABLE_INDEXING)
-    set (H5_PRIVATE_HEADERS
-      ${H5_PRIVATE_HEADERS}
-      ${HDF5_SRC_DIR}/H5Xprivate.h
-    )
-  ENDIF (HDF5_ENABLE_INDEXING)  
 ENDIF (HDF5_ENABLE_EFF)
 
 set (H5_GENERATED_HEADERS

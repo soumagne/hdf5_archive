@@ -16,7 +16,6 @@
 #include "H5VLiod_server.h"
 
 #ifdef H5_HAVE_EFF
-#ifdef H5_HAVE_INDEXING
 
 /*
  * Programmer:  Mohamad Chaarawi <chaarawi@hdfgroup.gov>
@@ -347,5 +346,4 @@ done:
 
 } /* end H5VL_iod_server_dset_remove_index_info_cb() */
 
-#endif /* H5_HAVE_INDEXING */
 #endif /* H5_HAVE_EFF */
