@@ -29,9 +29,6 @@
 #include "H5Iprivate.h"		/* IDs */
 #include "H5MMprivate.h"	/* Memory management */
 #include "H5Pprivate.h"
-#include "H5FFprivate.h"
-#include "H5RCprivate.h"
-#include "H5TRprivate.h"
 #include "H5Qprivate.h"
 #include "H5Sprivate.h"
 /* TODO using private headers but could use public ones */
@@ -39,6 +36,19 @@
 /****************/
 /* Local Macros */
 /****************/
+//#define H5X_DUMMY_DEBUG
+
+#ifdef H5X_DUMMY_DEBUG
+#define H5X_DUMMY_LOG_DEBUG(...) do {                           \
+      fprintf(stdout, " # %s(): ", __func__);                   \
+      fprintf(stdout, __VA_ARGS__);                             \
+      fprintf(stdout, "\n");                                    \
+      fflush(stdout);                                           \
+  } while (0)
+#else
+#define H5X_DUMMY_LOG_DEBUG(...) do { \
+  } while (0)
+#endif
 
 /******************/
 /* Local Typedefs */
@@ -61,16 +71,15 @@ typedef struct H5X__dummy_query_data_t {
 /********************/
 
 static void *
-H5X_dummy_create(hid_t file_id, hid_t dataset_id, hid_t xcpl_id,
-        hid_t xapl_id, size_t *metadata_size, void **metadata);
+H5X_dummy_create(hid_t dataset_id, hid_t xcpl_id, hid_t xapl_id,
+        size_t *metadata_size, void **metadata);
 
 static herr_t
-H5X_dummy_remove(hid_t file_id, hid_t dataset_id, size_t metadata_size,
-        void *metadata);
+H5X_dummy_remove(hid_t file_id, size_t metadata_size, void *metadata);
 
 static void *
-H5X_dummy_open(hid_t file_id, hid_t dataset_id, hid_t xapl_id,
-        size_t metadata_size, void *metadata);
+H5X_dummy_open(hid_t dataset_id, hid_t xapl_id, size_t metadata_size,
+        void *metadata);
 
 static herr_t
 H5X_dummy_close(void *idx_handle);
@@ -82,13 +91,16 @@ static herr_t
 H5X_dummy_post_update(void *idx_handle, const void *buf, hid_t dataspace_id,
         hid_t xxpl_id);
 
-static herr_t
-H5X_dummy_query(void *idx_handle, hid_t query_id, hid_t xxpl_id,
-        hid_t *dataspace_id);
+static hid_t
+H5X_dummy_query(void *idx_handle, hid_t dataspace_id, hid_t query_id,
+        hid_t xxpl_id);
 
 static herr_t
 H5X__dummy_get_query_data_cb(void *elem, hid_t type_id, unsigned ndim,
         const hsize_t *point, void *_udata);
+
+static herr_t
+H5X_dummy_get_size(void *idx_handle, hsize_t *idx_size);
 
 /*********************/
 /* Package Variables */
@@ -115,7 +127,9 @@ const H5X_class_t H5X_DUMMY[1] = {{
     H5X_dummy_pre_update,   /* pre_update */
     H5X_dummy_post_update,  /* post_update */
     H5X_dummy_query,        /* query */
-    NULL                    /* refresh */
+    NULL,                   /* refresh */
+    NULL,                   /* copy */
+    H5X_dummy_get_size      /* get_size */
 }};
 
 /*-------------------------------------------------------------------------
@@ -128,8 +142,7 @@ const H5X_class_t H5X_DUMMY[1] = {{
  *-------------------------------------------------------------------------
  */
 static herr_t
-H5X__dummy_read_data(hid_t dataset_id, hid_t rcxt_id, void **buf,
-        size_t *buf_size)
+H5X__dummy_read_data(hid_t dataset_id, void **buf, size_t *buf_size)
 {
     herr_t ret_value = SUCCEED; /* Return value */
     hid_t type_id = FAIL, space_id = FAIL;
@@ -155,8 +168,7 @@ H5X__dummy_read_data(hid_t dataset_id, hid_t rcxt_id, void **buf,
         HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, FAIL, "can't allocate read buffer");
 
     /* Read data from dataset */
-    if (FAIL == H5Dread_ff(dataset_id, type_id, H5S_ALL, space_id,
-            H5P_DEFAULT, data, rcxt_id, H5_EVENT_STACK_NULL))
+    if (FAIL == H5Dread(dataset_id, type_id, H5S_ALL, space_id, H5P_DEFAULT, data))
         HGOTO_ERROR(H5E_INDEX, H5E_READERROR, FAIL, "can't read data");
 
     *buf = data;
@@ -183,19 +195,19 @@ done:
  *------------------------------------------------------------------------
  */
 static void *
-H5X_dummy_create(hid_t file_id, hid_t dataset_id, hid_t H5_ATTR_UNUSED xcpl_id,
-        hid_t xapl_id, size_t *metadata_size, void **metadata)
+H5X_dummy_create(hid_t dataset_id, hid_t H5_ATTR_UNUSED xcpl_id, hid_t H5_ATTR_UNUSED xapl_id,
+        size_t *metadata_size, void **metadata)
 {
     H5X_dummy_t *dummy = NULL;
-    hid_t type_id, space_id, trans_id = FAIL, rcxt_id = FAIL;
+    hid_t file_id = FAIL, type_id, space_id;
     void *buf = NULL;
     size_t buf_size;
-    uint64_t version;
+    H5O_info_t dset_info;
     void *ret_value = NULL; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    printf("Calling H5X_dummy_create\n");
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_create");
 
     if (NULL == (dummy = (H5X_dummy_t *) H5MM_malloc(sizeof(H5X_dummy_t))))
         HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, NULL, "can't allocate dummy struct");
@@ -207,39 +219,37 @@ H5X_dummy_create(hid_t file_id, hid_t dataset_id, hid_t H5_ATTR_UNUSED xcpl_id,
     if (FAIL == (space_id = H5Dget_space(dataset_id)))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get dataspace from dataset");
 
-#ifdef H5_HAVE_INDEXING
-    /* Get transaction ID from xapl */
-    if (FAIL == H5Pget_xapl_transaction(xapl_id, &trans_id))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get trans_id from xapl");
-#endif
-    /* Create read context from version */
-    if (FAIL == H5TRget_version(trans_id, &version))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get version from transaction ID");
-    if (FAIL == (rcxt_id =  H5RCcreate(file_id, version)))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTCREATE, NULL, "can't create read context");
-
     /* Get data from dataset */
-    if (FAIL == H5X__dummy_read_data(dataset_id, rcxt_id, &buf, &buf_size))
+    if (FAIL == H5X__dummy_read_data(dataset_id, &buf, &buf_size))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get data from dataset");
 
+    /* Get file ID */
+    if (FAIL == (file_id = H5Iget_file_id(dataset_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get file ID from dataset");
+
     /* Create anonymous datasets */
-    if (FAIL == (dummy->idx_anon_id = H5Dcreate_anon_ff(file_id, type_id, space_id,
-            H5P_DEFAULT, H5P_DEFAULT, trans_id, H5_EVENT_STACK_NULL)))
+    if (FAIL == (dummy->idx_anon_id = H5Dcreate_anon(file_id, type_id, space_id,
+            H5P_DEFAULT, H5P_DEFAULT)))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTCREATE, NULL, "can't create anonymous dataset");
 
     /* Update index elements (simply write data for now) */
-    if (FAIL == H5Dwrite_ff(dummy->idx_anon_id, type_id, H5S_ALL,
-            H5S_ALL, H5P_DEFAULT, buf, trans_id, H5_EVENT_STACK_NULL))
+    if (FAIL == H5Dwrite(dummy->idx_anon_id, type_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, NULL, "can't update index elements");
 
-    if (FAIL == H5Oget_token(dummy->idx_anon_id, NULL, &dummy->idx_token_size))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get token size for anonymous dataset");
+    /* Increment refcount so that anonymous dataset is persistent */
+    if (FAIL == H5Oincr_refcount(dummy->idx_anon_id))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTINC, NULL, "can't increment dataset refcount");
+
+    /* Get addr info for dataset */
+    if (FAIL == H5Oget_info(dummy->idx_anon_id, &dset_info))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get dataset info");
+
+    dummy->idx_token_size = sizeof(haddr_t);
 
     if (NULL == (dummy->idx_token = H5MM_malloc(dummy->idx_token_size)))
         HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, NULL, "can't allocate token  for anonymous dataset");
 
-    if (FAIL == H5Oget_token(dummy->idx_anon_id, dummy->idx_token, &dummy->idx_token_size))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get token for anonymous dataset");
+    HDmemcpy(dummy->idx_token, &dset_info.addr, sizeof(haddr_t));
 
     /* Metadata is token for anonymous dataset */
     *metadata = dummy->idx_token;
@@ -248,8 +258,8 @@ H5X_dummy_create(hid_t file_id, hid_t dataset_id, hid_t H5_ATTR_UNUSED xcpl_id,
     ret_value = dummy;
 
 done:
-    if (FAIL != rcxt_id)
-        H5RCclose(rcxt_id);
+    if (FAIL != file_id)
+        H5Fclose(file_id);
     H5MM_free(buf);
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5X_dummy_create() */
@@ -264,17 +274,28 @@ done:
  *-------------------------------------------------------------------------
  */
 static herr_t
-H5X_dummy_remove(hid_t H5_ATTR_UNUSED file_id, hid_t H5_ATTR_UNUSED dataset_id, size_t H5_ATTR_UNUSED metadata_size,
-        void H5_ATTR_UNUSED *metadata)
+H5X_dummy_remove(hid_t file_id, size_t metadata_size, void *metadata)
 {
+    hid_t idx_anon_id = FAIL;
     herr_t ret_value = SUCCEED; /* Return value */
 
-    FUNC_ENTER_NOAPI_NOINIT_NOERR
+    FUNC_ENTER_NOAPI_NOINIT
 
-    printf("Calling H5X_dummy_remove\n");
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_remove");
 
-    /* TODO Does not do anything */
+    if (metadata_size < sizeof(haddr_t))
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "metadata size is not valid");
 
+    if (FAIL == (idx_anon_id = H5Oopen_by_addr(file_id, *((haddr_t *) metadata))))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTOPENOBJ, FAIL, "can't open anonymous dataset");
+
+    /* Decrement refcount so that anonymous dataset gets deleted */
+    if (FAIL == H5Odecr_refcount(idx_anon_id))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTDEC, FAIL, "can't decrement dataset refcount");
+
+done:
+    if (FAIL != idx_anon_id)
+        H5Dclose(idx_anon_id);
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5X_dummy_remove() */
 
@@ -289,26 +310,21 @@ H5X_dummy_remove(hid_t H5_ATTR_UNUSED file_id, hid_t H5_ATTR_UNUSED dataset_id, 
  *-------------------------------------------------------------------------
  */
 static void *
-H5X_dummy_open(hid_t file_id, hid_t dataset_id, hid_t xapl_id,
-        size_t metadata_size, void *metadata)
+H5X_dummy_open(hid_t dataset_id, hid_t H5_ATTR_UNUSED xapl_id, size_t metadata_size,
+        void *metadata)
 {
+    hid_t file_id;
     H5X_dummy_t *dummy = NULL;
-    hid_t trans_id, rc_id;
-    uint64_t c_version;
     void *ret_value = NULL; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    printf("Calling H5X_dummy_open\n");
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_open");
 
     if (!metadata_size)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, NULL, "NULL metadata size");
     if (!metadata)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, NULL, "NULL metadata");
-#ifdef H5_HAVE_INDEXING
-    if (FAIL == H5Pget_xapl_read_context(xapl_id, &rc_id))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get rc_id from xapl");
-#endif
     if (NULL == (dummy = (H5X_dummy_t *) H5MM_malloc(sizeof(H5X_dummy_t))))
         HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, NULL, "can't allocate dummy struct");
 
@@ -318,13 +334,11 @@ H5X_dummy_open(hid_t file_id, hid_t dataset_id, hid_t xapl_id,
         HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, NULL, "can't allocate token");
     HDmemcpy(dummy->idx_token, metadata, dummy->idx_token_size);
 
-    /* TODO do that like this for now */
-    H5RCget_version(rc_id, &c_version);
-    trans_id = H5TRcreate(file_id, rc_id, c_version);
-    if (FAIL == (dummy->idx_anon_id = H5Oopen_by_token(dummy->idx_token,
-            trans_id, H5_EVENT_STACK_NULL)))
+    if (FAIL == (file_id = H5Iget_file_id(dataset_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get file ID from dataset");
+
+    if (FAIL == (dummy->idx_anon_id = H5Oopen_by_addr(file_id, *((haddr_t *) dummy->idx_token))))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTOPENOBJ, NULL, "can't open anonymous dataset");
-    H5TRclose(trans_id);
 
     ret_value = dummy;
 
@@ -349,13 +363,13 @@ H5X_dummy_close(void *idx_handle)
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    printf("Calling H5X_dummy_close\n");
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_close");
 
     if (NULL == dummy)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL index handle");
 
     /* Close anonymous dataset */
-    if (FAIL == H5Dclose_ff(dummy->idx_anon_id, H5_EVENT_STACK_NULL))
+    if (FAIL == H5Dclose(dummy->idx_anon_id))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTCLOSEOBJ, FAIL, "can't close anonymous dataset for index");
 
     H5MM_free(dummy->idx_token);
@@ -382,7 +396,7 @@ H5X_dummy_pre_update(void *idx_handle, hid_t H5_ATTR_UNUSED dataspace_id, hid_t 
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    printf("Calling H5X_dummy_pre_update\n");
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_pre_update");
 
     if (NULL == dummy)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL index handle");
@@ -403,15 +417,15 @@ done:
  */
 static herr_t
 H5X_dummy_post_update(void *idx_handle, const void *buf, hid_t dataspace_id,
-        hid_t xxpl_id)
+        hid_t H5_ATTR_UNUSED xxpl_id)
 {
     H5X_dummy_t *dummy = (H5X_dummy_t *) idx_handle;
-    hid_t mem_type_id, file_space_id, trans_id;
+    hid_t mem_type_id, file_space_id;
     herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    printf("Calling H5X_dummy_post_update\n");
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_post_update");
 
     if (NULL == dummy)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL index handle");
@@ -420,14 +434,10 @@ H5X_dummy_post_update(void *idx_handle, const void *buf, hid_t dataspace_id,
         HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get type from dataset");
     if (FAIL == (file_space_id = H5Dget_space(dummy->idx_anon_id)))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get dataspace from dataset");
-#ifdef H5_HAVE_INDEXING
-    if (FAIL == H5Pget_xxpl_transaction(xxpl_id, &trans_id))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get trans_id from xxpl");
-#endif
 
     /* Update index elements (simply write data for now) */
-    if (FAIL == H5Dwrite_ff(dummy->idx_anon_id, mem_type_id, dataspace_id,
-            file_space_id, H5P_DEFAULT, buf, trans_id, H5_EVENT_STACK_NULL))
+    if (FAIL == H5Dwrite(dummy->idx_anon_id, mem_type_id, dataspace_id,
+            file_space_id, H5P_DEFAULT, buf))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "can't update index elements");
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -455,7 +465,7 @@ H5X__dummy_get_query_data_cb(void *elem, hid_t type_id, unsigned H5_ATTR_UNUSED 
     FUNC_ENTER_NOAPI_NOINIT
 
     /* Apply the query */
-    if (H5Qapply(udata->query_id, &result, type_id, elem) < 0)
+    if (H5Qapply_singleton(udata->query_id, &result, type_id, elem) < 0)
         HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query to data element");
 
     /* Initialize count */
@@ -487,29 +497,24 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t
-H5X_dummy_query(void *idx_handle, hid_t query_id, hid_t xxpl_id,
-        hid_t *dataspace_id)
+static hid_t
+H5X_dummy_query(void *idx_handle, hid_t H5_ATTR_UNUSED dataspace_id, hid_t query_id,
+        hid_t H5_ATTR_UNUSED xxpl_id)
 {
     H5X_dummy_t *dummy = (H5X_dummy_t *) idx_handle;
     H5X__dummy_query_data_t udata;
     hid_t space_id, type_id;
-    hid_t rcxt_id;
     size_t nelmts;
     size_t elmt_size = 0, buf_size = 0;
     void *buf = NULL;
-    herr_t ret_value = SUCCEED; /* Return value */
+    hid_t ret_value = FAIL; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    printf("Calling H5X_dummy_query\n");
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_query");
 
     if (NULL == dummy)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL index handle");
-#ifdef H5_HAVE_INDEXING
-    if (FAIL == H5Pget_xxpl_read_context(xxpl_id, &rcxt_id))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get rcxt_id from xxpl");
-#endif
     if (FAIL == (type_id = H5Dget_type(dummy->idx_anon_id)))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get type from index");
     if (FAIL == (space_id = H5Dget_space(dummy->idx_anon_id)))
@@ -525,8 +530,8 @@ H5X_dummy_query(void *idx_handle, hid_t query_id, hid_t xxpl_id,
         HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, FAIL, "can't allocate read buffer");
 
     /* read data from index */
-    if (FAIL == H5Dread_ff(dummy->idx_anon_id, type_id, H5S_ALL, space_id,
-            H5P_DEFAULT, buf, rcxt_id, H5_EVENT_STACK_NULL))
+    if (FAIL == H5Dread(dummy->idx_anon_id, type_id, H5S_ALL, space_id,
+            H5P_DEFAULT, buf))
         HGOTO_ERROR(H5E_INDEX, H5E_READERROR, FAIL, "can't read data");
 
     if(FAIL == (udata.space_query = H5Scopy(space_id)))
@@ -542,11 +547,44 @@ H5X_dummy_query(void *idx_handle, hid_t query_id, hid_t xxpl_id,
     if (H5Diterate(buf, type_id, space_id, H5X__dummy_get_query_data_cb, &udata) < 0)
         HGOTO_ERROR(H5E_INDEX, H5E_CANTCOMPUTE, FAIL, "failed to compute buffer size");
 
-    *dataspace_id = udata.space_query;
-    printf("Created dataspace from index with %d elements\n",
-            (int) H5Sget_select_npoints(*dataspace_id));
+    ret_value = udata.space_query;
+    H5X_DUMMY_LOG_DEBUG("Created dataspace from index with %d elements",
+            (int) H5Sget_select_npoints(ret_value));
 
 done:
     H5MM_free(buf);
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5X_dummy_query() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5X_dummy_get_size
+ *
+ * Purpose: This function gets the storage size of the index.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5X_dummy_get_size(void *idx_handle, hsize_t *idx_size)
+{
+    H5X_dummy_t *dummy = (H5X_dummy_t *) idx_handle;
+    hsize_t size;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+    H5X_DUMMY_LOG_DEBUG("Enter");
+
+    if (NULL == dummy)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL index handle");
+    if (!idx_size)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL pointer");
+
+    size = H5Dget_storage_size(dummy->idx_anon_id);
+
+    *idx_size = size;
+
+done:
+    H5X_DUMMY_LOG_DEBUG("Leave");
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X_dummy_get_size */

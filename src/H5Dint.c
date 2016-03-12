@@ -32,6 +32,7 @@
 #include "H5Lprivate.h"		/* Links		  		*/
 #include "H5MMprivate.h"	/* Memory management			*/
 #include "H5VLprivate.h"	/* Virtual Object Layer                 */
+#include "H5Qprivate.h"		/* Query				*/
 
 /****************/
 /* Local Macros */
@@ -66,6 +67,16 @@ static herr_t H5D__update_oh_info(H5F_t *file, hid_t dxpl_id, H5D_t *dset,
 static herr_t H5D__open_oid(H5D_t *dataset, hid_t dapl_id, hid_t dxpl_id);
 static herr_t H5D__init_storage(const H5D_t *dataset, hbool_t full_overwrite,
     hsize_t old_dim[], hid_t dxpl_id);
+
+/* TODO change H5D_open_index to H5D__open_index */
+static herr_t H5D_open_index(H5D_t *dset, hid_t xapl_id);
+static herr_t H5D_close_index(H5D_t *dset);
+static H5S_t *H5D__query(H5D_t *dset, const H5S_t *file_space, H5Q_t *query,
+    hid_t xapl_id, hid_t xxpl_id);
+static H5S_t *H5D__query_singleton(H5D_t *dset, const H5S_t *file_space, H5Q_t *query,
+    hid_t xapl_id, hid_t xxpl_id);
+static H5S_t *H5D__query_combined(H5D_t *dset, const H5S_t *file_space, H5Q_t *query,
+    hid_t xapl_id, hid_t xxpl_id);
 
 
 /*********************/
@@ -1384,6 +1395,7 @@ H5D__open_oid(H5D_t *dataset, hid_t dapl_id, hid_t dxpl_id)
 {
     H5P_genplist_t *plist;              /* Property list */
     H5O_fill_t *fill_prop;              /* Pointer to dataset's fill value info */
+    H5O_idxinfo_t *idx_info;            /* Pointer to dataset's info info */
     unsigned alloc_time_state;          /* Allocation time state */
     htri_t msg_exists;                  /* Whether a particular type of message exists */
     hbool_t layout_init = FALSE;    	/* Flag to indicate that chunk information was initialized */
@@ -1486,6 +1498,20 @@ H5D__open_oid(H5D_t *dataset, hid_t dapl_id, hid_t dxpl_id)
             || (dataset->shared->layout.type == H5D_VIRTUAL && fill_prop->alloc_time == H5D_ALLOC_TIME_INCR))
         alloc_time_state = 1;
 
+    /* Try to get the index info message from the object header */
+    if((msg_exists = H5O_msg_exists(&(dataset->oloc), H5O_IDXINFO_ID, dxpl_id)) < 0)
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't check if message exists");
+    if(msg_exists) {
+        H5X_class_t *idx_class = NULL;
+
+        idx_info = &dataset->shared->idx_info;
+        if(NULL == H5O_msg_read(&(dataset->oloc), H5O_IDXINFO_ID, idx_info, dxpl_id))
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't retrieve message");
+        if (NULL == (idx_class = H5X_registered(idx_info->plugin_id)))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get index plugin class");
+        dataset->shared->idx_class = idx_class;
+    } /* end if */
+
     /* Set revised fill value properties, if they are different from the defaults */
     if(H5P_fill_value_cmp(&H5D_def_dset.dcpl_cache.fill, fill_prop, sizeof(H5O_fill_t))) {
         if(H5P_set(plist, H5D_CRT_FILL_VALUE_NAME, fill_prop) < 0)
@@ -1566,6 +1592,10 @@ H5D_close(H5D_t *dataset)
 
     dataset->shared->fo_count--;
     if(dataset->shared->fo_count == 0) {
+        /* Close index object if index is closed */
+        if (dataset->shared->idx_handle && (FAIL == H5D_close_index(dataset)))
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTCLOSEOBJ, FAIL, "cannot close index")
+
         /* Flush the dataset's information.  Continue to close even if it fails. */
         if(H5D__flush_real(dataset, H5AC_dxpl_id) < 0)
             HDONE_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "unable to flush cached dataset info")
@@ -1675,6 +1705,10 @@ H5D_close(H5D_t *dataset)
         /* (This closes the file, if this is the last object open) */
         if(H5O_close(&(dataset->oloc)) < 0)
             HGOTO_ERROR(H5E_DATASET, H5E_CLOSEERROR, FAIL, "unable to release object header")
+
+        /* Release index info */
+        if (FAIL == H5O_msg_reset(H5O_IDXINFO_ID, &dataset->shared->idx_info))
+            free_failed = TRUE;
 
         /*
          * Free memory.  Before freeing the memory set the file pointer to NULL.
@@ -3128,3 +3162,397 @@ done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5D_get_type() */
 
+/*-------------------------------------------------------------------------
+ * Function:    H5D_set_index
+ *
+ * Purpose: Set index information.
+ *
+ * Return:  Success:    Non-negative
+ *      Failure:    Negative
+ *
+ *-------------------------------------------------------------------------
+ */
+herr_t
+H5D_set_index(H5D_t *dset, unsigned count, H5X_class_t **idx_class,
+        void **idx_handle, H5O_idxinfo_t *idx_info)
+{
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(dset);
+    /* Do not support more than one index for now */
+    HDassert(count <= 1);
+    HDassert(idx_class);
+    HDassert(idx_handle);
+    HDassert(idx_info);
+
+    /* Write the index header message */
+    if (H5O_msg_create(&dset->oloc, H5O_IDXINFO_ID, H5O_MSG_FLAG_CONSTANT, 0, idx_info, H5AC_dxpl_id))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTINIT, FAIL, "unable to update index header message");
+
+    /* Set user data for index */
+    dset->shared->idx_class = *idx_class;
+    dset->shared->idx_handle = *idx_handle;
+    if (NULL == H5O_msg_copy(H5O_IDXINFO_ID, idx_info, &dset->shared->idx_info))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTCOPY, FAIL, "unable to update copy message");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5D_set_index() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5D_get_index
+ *
+ * Purpose: Get index information.
+ *
+ * Return:  Success:    Non-negative
+ *      Failure:    Negative
+ *
+ *-------------------------------------------------------------------------
+ */
+herr_t
+H5D_get_index(H5D_t *dset, unsigned max_count, H5X_class_t **idx_class,
+        void **idx_handle, H5O_idxinfo_t **idx_info, unsigned *actual_count)
+{
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT_NOERR
+
+    HDassert(dset);
+    HDassert(max_count);
+
+    /* Get user data for index */
+    if (idx_class) *idx_class = dset->shared->idx_class;
+    if (idx_handle) *idx_handle = dset->shared->idx_handle;
+    if (idx_info) *idx_info = &dset->shared->idx_info;
+    /* Just one index for now */
+    if (actual_count) *actual_count = (dset->shared->idx_class) ? 1 : 0;
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5D_get_index() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5D_open_index
+ *
+ * Purpose: Open index.
+ *
+ * Return:  Success:    Non-negative
+ *      Failure:    Negative
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5D_open_index(H5D_t *dset, hid_t xapl_id)
+{
+    hid_t dset_id;
+    H5X_class_t *idx_class;
+    void *idx_handle = NULL;
+    size_t metadata_size;
+    void *metadata;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(dset);
+
+    dset_id = dset->shared->dset_id;
+    idx_class = dset->shared->idx_class;
+    metadata_size = dset->shared->idx_info.metadata_size;
+    metadata = dset->shared->idx_info.metadata;
+
+    if (NULL == H5I_object_verify(dset_id, H5I_DATASET))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a dataset");
+    if (NULL == metadata)
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "no index metadata was found");
+    if (NULL == idx_class->open)
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin open callback not defined");
+    if (NULL == (idx_handle = idx_class->open(dset_id, xapl_id, metadata_size, metadata)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTOPENOBJ, FAIL, "cannot open index");
+
+    dset->shared->idx_handle = idx_handle;
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5D_open_index() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5D_close_index
+ *
+ * Purpose: Close index.
+ *
+ * Return:  Success:    Non-negative
+ *      Failure:    Negative
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5D_close_index(H5D_t *dset)
+{
+    H5X_class_t *idx_class;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(dset);
+
+    idx_class = dset->shared->idx_class;
+    if (NULL == (idx_class->close))
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin close callback not defined");
+    if (FAIL == idx_class->close(dset->shared->idx_handle))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTCLOSEOBJ, FAIL, "cannot close index");
+
+    dset->shared->idx_handle = NULL;
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5D_close_index() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5D_remove_index
+ *
+ * Purpose: Remove index.
+ *
+ * Return:  Success:    Non-negative
+ *      Failure:    Negative
+ *
+ *-------------------------------------------------------------------------
+ */
+herr_t
+H5D_remove_index(H5D_t *dset, unsigned H5_ATTR_UNUSED plugin_id)
+{
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(dset);
+
+    /* First close index if opened */
+    if (dset->shared->idx_handle && (FAIL == H5D_close_index(dset)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTCLOSEOBJ, FAIL, "cannot close index");
+
+    /* Remove idx_handle from dataset */
+    if (H5O_msg_remove(&dset->oloc, H5O_IDXINFO_ID, H5O_ALL, TRUE, H5AC_dxpl_id) < 0)
+        HGOTO_ERROR(H5E_SYM, H5E_CANTDELETE, FAIL, "unable to delete index messages");
+
+    if (FAIL == H5O_msg_reset(H5O_IDXINFO_ID, &dset->shared->idx_info))
+        HGOTO_ERROR(H5E_SYM, H5E_CANTDELETE, FAIL, "unable to free index index");
+
+    dset->shared->idx_class = NULL;
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5D_remove_index() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5D_get_index_size
+ *
+ * Purpose: Get index index.
+ *
+ * Return:  Success:    Non-negative
+ *      Failure:    Negative
+ *
+ *-------------------------------------------------------------------------
+ */
+herr_t H5D_get_index_size(H5D_t *dset, hsize_t *idx_size)
+{
+    H5X_class_t *idx_class = NULL;
+    hsize_t actual_size = 0;
+    hid_t xapl_id = H5P_INDEX_ACCESS_DEFAULT; /* TODO for now */
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(dset);
+    HDassert(idx_size);
+
+    idx_class = dset->shared->idx_class;
+    if (!idx_class)
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "index class not defined");
+    if (NULL == (idx_class->get_size))
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin get size callback not defined");
+    if (!dset->shared->idx_handle && (FAIL == H5D_open_index(dset, xapl_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTOPENOBJ, FAIL, "cannot open index");
+    if (FAIL == idx_class->get_size(dset->shared->idx_handle, &actual_size))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "cannot get index size");
+
+    *idx_size = actual_size;
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5D_get_index_size() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5D_query
+ *
+ * Purpose: Returns a dataspace selection of dataset elements that match
+ *          the query.
+ *
+ * Return:  Success:    The dataspace selection
+ *          Failure:    NULL
+ *
+ *-------------------------------------------------------------------------
+ */
+H5S_t *
+H5D_query(H5D_t *dset, const H5S_t *file_space, H5Q_t *query, hid_t xapl_id,
+        hid_t xxpl_id)
+{
+    H5S_t *ret_value = NULL;
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(dset);
+    /* file_space can be NULL */
+    HDassert(query);
+
+    /* Call query routine of index plugin */
+    if (NULL == (ret_value = H5D__query(dset, file_space, query, xapl_id, xxpl_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTSELECT, NULL, "cannot query index");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5D_query */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5D__query
+ *
+ * Purpose: Returns a dataspace selection of dataset elements that match
+ *          the query.
+ *
+ * Return:  Success:    The dataspace selection
+ *          Failure:    NULL
+ *
+ *-------------------------------------------------------------------------
+ */
+static H5S_t *
+H5D__query(H5D_t *dset, const H5S_t *file_space, H5Q_t *query, hid_t xapl_id,
+        hid_t xxpl_id)
+{
+    H5Q_combine_op_t combine_op;
+    H5S_t *(*query_func)(H5D_t *dset, const H5S_t *file_space, H5Q_t *query, hid_t xapl_id, hid_t xxpl_id);
+    H5S_t *ret_value = NULL;
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(dset);
+    /* file_space can be NULL */
+    HDassert(query);
+
+    if (FAIL == H5Q_get_combine_op(query, &combine_op))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, NULL, "unable to get combine operator");
+
+    query_func = (combine_op == H5Q_SINGLETON) ? H5D__query_singleton : H5D__query_combined;
+    if (NULL == (ret_value = query_func(dset, file_space, query, xapl_id, xxpl_id)))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, NULL, "unable to get combine operator");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5D__query */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5D__query_singleton
+ *
+ * Purpose: Returns a dataspace selection of dataset elements that match
+ *          the singleton query.
+ *
+ * Return:  Success:    The dataspace selection
+ *          Failure:    NULL
+ *
+ *-------------------------------------------------------------------------
+ */
+static H5S_t *
+H5D__query_singleton(H5D_t *dset, const H5S_t *file_space, H5Q_t *query,
+        hid_t xapl_id, hid_t xxpl_id)
+{
+    H5X_class_t *idx_class;
+    hid_t file_space_id = H5S_ALL;
+    hid_t space_id = FAIL;
+    H5S_t *ret_value = NULL;
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(dset);
+    /* file_space can be NULL */
+    HDassert(query->is_combined == FALSE);
+
+    idx_class = dset->shared->idx_class;
+
+    if (file_space && (FAIL == (file_space_id = H5I_register(H5I_DATASPACE, file_space, FALSE))))
+        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, NULL, "unable to register dataspace");
+
+    if (!idx_class)
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, NULL, "index class not defined");
+    if (NULL == idx_class->query)
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, NULL, "plugin query callback not defined");
+    /* Open index if not opened yet */
+    if (!dset->shared->idx_handle && (FAIL == H5D_open_index(dset, xapl_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTOPENOBJ, NULL, "cannot open index");
+    /* Call plugin query */
+    if (FAIL == (space_id = idx_class->query(dset->shared->idx_handle, file_space_id, query->query_id, xxpl_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTSELECT, NULL, "cannot query index");
+    if (NULL == (ret_value = (H5S_t *) H5I_object_verify(space_id, H5I_DATASPACE)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a dataspace");
+
+    /* Check for valid selection */
+    if (H5S_SELECT_VALID(ret_value) != TRUE)
+        HGOTO_ERROR(H5E_DATASPACE, H5E_BADRANGE, NULL, "file selection+offset not within extent");
+
+done:
+    if ((file_space_id != H5S_ALL) && (NULL == H5I_remove(file_space_id)))
+        HDONE_ERROR(H5E_ATOM, H5E_CANTFREE, NULL, "cannot free space id");
+    if ((space_id != FAIL) && (NULL == H5I_remove(space_id)))
+        HDONE_ERROR(H5E_ATOM, H5E_CANTFREE, NULL, "cannot free space id");
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5D__query_singleton */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5D__query_combined
+ *
+ * Purpose: Returns a dataspace selection of dataset elements that match
+ *          the combined query.
+ *
+ * Return:  Success:    The dataspace selection
+ *          Failure:    NULL
+ *
+ *-------------------------------------------------------------------------
+ */
+static H5S_t *
+H5D__query_combined(H5D_t *dset, const H5S_t *file_space, H5Q_t *query,
+        hid_t xapl_id, hid_t xxpl_id)
+{
+    H5Q_t *sub_query1 = NULL, *sub_query2 = NULL;
+    H5S_t *sub_selection1 = NULL, *sub_selection2 = NULL;
+    H5S_seloper_t seloper;
+    H5S_t *ret_value = NULL;
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(dset);
+    /* file_space can be NULL */
+    HDassert(query->is_combined == TRUE);
+
+    if (FAIL == H5Q_get_components(query, &sub_query1, &sub_query2))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, NULL, "unable to get components");
+    if (NULL == (sub_selection1 = H5D__query(dset, file_space, sub_query1, xapl_id, xxpl_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTSELECT, NULL, "cannot query index for sub-query");
+    if (NULL == (sub_selection2 = H5D__query(dset, file_space, sub_query2, xapl_id, xxpl_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTSELECT, NULL, "cannot query index for sub-query");
+
+    /* Combine results */
+    seloper = (query->query.combine.op == H5Q_COMBINE_AND) ? H5S_SELECT_AND : H5S_SELECT_OR;
+    if (NULL == (ret_value = H5S_combine_select(sub_selection1, seloper, sub_selection2)))
+        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTMERGE, NULL, "cannot combine sub-selections");
+
+done:
+    if (sub_query1 && (FAIL == H5Q_close(sub_query1)))
+        HDONE_ERROR(H5E_QUERY, H5E_CANTFREE, NULL, "cannot free query");
+    if (sub_query2 && (FAIL == H5Q_close(sub_query2)))
+        HDONE_ERROR(H5E_QUERY, H5E_CANTFREE, NULL, "cannot free query");
+    if (sub_selection1 && (FAIL == H5S_close(sub_selection1)))
+        HDONE_ERROR(H5E_DATASPACE, H5E_CANTFREE, NULL, "cannot free dataspace");
+    if (sub_selection2 && (FAIL == H5S_close(sub_selection2)))
+        HDONE_ERROR(H5E_DATASPACE, H5E_CANTFREE, NULL, "cannot free dataspace");
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5D__query_combined */

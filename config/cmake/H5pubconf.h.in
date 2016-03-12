@@ -236,9 +236,6 @@
 /* Define if we have Python support */
 #cmakedefine H5_HAVE_PYTHON @H5_HAVE_PYTHON@
 
-/* Define if we have Indexing support */
-#cmakedefine H5_HAVE_INDEXING @H5_HAVE_INDEXING@
-
 /* Define if we have support for ALACRITY */
 #cmakedefine H5_HAVE_ALACRITY @H5_HAVE_ALACRITY@
 

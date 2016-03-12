@@ -27,9 +27,18 @@
 /* Library Private Macros */
 /**************************/
 
+/* ========  Index creation property names ======== */
+#define H5X_CRT_READ_ON_CREATE_NAME "read_on_create" /* Read existing data when creating index */
+
+/* ========  Index access property names ======== */
+
+/* ======== Index transfer properties ======== */
+
+
 /****************************/
 /* Library Private Typedefs */
 /****************************/
+
 
 /*****************************/
 /* Library Private Variables */
@@ -42,19 +51,14 @@ H5_DLL herr_t H5X_init(void);
 
 H5_DLL H5X_class_t *H5X_registered(unsigned plugin_id);
 H5_DLL herr_t H5X_register(const H5X_class_t *index_plugin);
-H5_DLL herr_t H5X_unregister(unsigned intex_type);
+H5_DLL herr_t H5X_unregister(unsigned plugin_id);
 
-H5_DLL herr_t H5X_create(hid_t file_id, unsigned plugin_id, hid_t scope_id,
-        hid_t xcpl_id);
-H5_DLL herr_t H5X_create_ff(hid_t file_id, unsigned plugin_id,
-        hid_t scope_id, hid_t xcpl_id, hid_t trans_id, hid_t estack_id);
+H5_DLL herr_t H5X_create(hid_t dset_id, unsigned plugin_id, hid_t xcpl_id);
+H5_DLL herr_t H5X_remove(hid_t dset_id, unsigned plugin_id);
+H5_DLL herr_t H5X_can_create(hid_t dset_id, hid_t dcpl_id);
 
-H5_DLL herr_t H5X_remove(hid_t file_id, unsigned plugin_id, hid_t scope_id);
-H5_DLL herr_t H5X_remove_ff(hid_t file_id, unsigned plugin_id, hid_t scope_id,
-        hid_t trans_id, hid_t estack_id);
+H5_DLL herr_t H5X_get_count(hid_t dset_id, hsize_t *idx_count);
 
-H5_DLL herr_t H5X_get_count(hid_t scope_id, hsize_t *idx_count);
-H5_DLL herr_t H5X_get_count_ff(hid_t scope_id, hsize_t *idx_count, hid_t rcxt_id,
-        hid_t estack_id);
+H5_DLL herr_t H5X_get_size(hid_t dset_id, hsize_t *idx_size);
 
 #endif /* _H5Xprivate_H */

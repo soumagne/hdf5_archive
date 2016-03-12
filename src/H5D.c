@@ -166,6 +166,13 @@ H5Dcreate2(hid_t loc_id, const char *name, hid_t type_id, hid_t space_id,
     if((ret_value = H5VL_register_id(H5I_DATASET, dset, obj->vol_info, TRUE)) < 0)
 	HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to atomize dataset handle")
 
+    /* Keep ID of the dataset */
+    dset->shared->dset_id = ret_value;
+
+    /* Create index if told to */
+    if(H5X_can_create(ret_value, dcpl_id) < 0)
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTCREATE, FAIL, "Index can't be created on this dataset")
+
 done:
     if (ret_value < 0 && dset)
         if(H5VL_dataset_close (dset, obj->vol_info->vol_cls, H5AC_dxpl_id, H5_REQUEST_NULL) < 0)
@@ -326,6 +333,9 @@ H5Dopen2(hid_t loc_id, const char *name, hid_t dapl_id)
     /* Get an atom for the dataset */
     if((ret_value = H5VL_register_id(H5I_DATASET, dset, obj->vol_info, TRUE)) < 0)
 	HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to atomize dataset handle")
+
+    /* Keep ID of the dataset */
+    dset->shared->dset_id = ret_value;
 
 done:
     if (ret_value < 0 && dset)
@@ -1071,3 +1081,60 @@ done:
 
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5D_close_dataset() */
+
+
+/*-------------------------------------------------------------------------
+ * Function:    H5Dquery
+ *
+ * Purpose: Returns a dataspace selection of dataset elements that match
+ *          the query.
+ *
+ * Return:  Success:    The ID of the dataspace selection
+ *          Failure:    FAIL
+
+ *
+ *-------------------------------------------------------------------------
+ */
+hid_t
+H5Dquery(hid_t dset_id, hid_t file_space_id, hid_t query_id, hid_t xapl_id)
+{
+    H5D_t *dset = NULL;
+    const H5S_t *file_space = NULL;
+    H5S_t *ret_space = NULL;
+    H5Q_t *query = NULL;
+    hid_t xxpl_id = H5P_INDEX_XFER_DEFAULT; /* TODO for now */
+    hid_t ret_value;
+
+    FUNC_ENTER_API(FAIL)
+    H5TRACE4("i", "iiii", dset_id, file_space_id, query_id, xapl_id);
+
+    /* Check arguments */
+    if (NULL == (dset = (H5D_t *) H5I_object_verify(dset_id, H5I_DATASET)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a dataset");
+    if (H5S_ALL != file_space_id) {
+        if (NULL == (file_space = (const H5S_t *) H5I_object_verify(file_space_id, H5I_DATASPACE)))
+            HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a dataspace");
+
+        /* Check for valid selection */
+        if (H5S_SELECT_VALID(file_space) != TRUE)
+            HGOTO_ERROR(H5E_DATASPACE, H5E_BADRANGE, FAIL, "file selection+offset not within extent");
+    } /* end if */
+    if (NULL == (query = (H5Q_t *) H5I_object_verify(query_id, H5I_QUERY)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a query");
+
+    /* Get the default index access property list if the user didn't provide one */
+    if (H5P_DEFAULT == xapl_id)
+        xapl_id = H5P_INDEX_ACCESS_DEFAULT;
+    else
+        if (TRUE != H5P_isa_class(xapl_id, H5P_INDEX_ACCESS))
+            HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not index access parms");
+
+    if (NULL == (ret_space = H5D_query(dset, file_space, query, xapl_id, xxpl_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTSELECT, FAIL, "cannot query dataset");
+
+    if ((ret_value = H5I_register(H5I_DATASPACE, ret_space, TRUE)) < 0)
+        HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register dataspace");
+
+done:
+    FUNC_LEAVE_API(ret_value)
+} /* end H5Dquery() */

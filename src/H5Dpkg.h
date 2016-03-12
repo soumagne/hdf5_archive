@@ -409,6 +409,7 @@ typedef struct H5D_rdcdc_t {
  * there will be two IDs and two H5D_t structs, both sharing one H5D_shared_t.
  */
 typedef struct H5D_shared_t {
+    hid_t               dset_id;        /* ID of this dataset              */
     size_t              fo_count;       /* Reference count */
     hbool_t             closing;        /* Flag to indicate dataset is closing */
     hid_t               type_id;        /* ID for dataset's datatype    */
@@ -425,6 +426,10 @@ typedef struct H5D_shared_t {
     unsigned            ndims;          /* The dataset's dataspace rank */
     hsize_t             curr_dims[H5S_MAX_RANK];    /* The curr. size of dataset dimensions */
     hsize_t             max_dims[H5S_MAX_RANK];     /* The max. size of dataset dimensions */ 
+
+    void               *idx_handle;     /* Handle for the index */
+    H5X_class_t        *idx_class;      /* Class for the index */
+    H5O_idxinfo_t       idx_info;       /* Index information */
 
     /* Buffered/cached information for types of raw data storage*/
     struct {
