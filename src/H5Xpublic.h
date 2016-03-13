@@ -35,6 +35,7 @@
 #define H5X_PLUGIN_DUMMY    1    /* dummy                 */
 #define H5X_PLUGIN_FASTBIT  2    /* fastbit               */
 #define H5X_PLUGIN_ALACRITY 3    /* alacrity              */
+#define H5X_PLUGIN_DUMMY_FF 4    /* dummy                 */
 
 #define H5X_PLUGIN_RESERVED 64   /* plugin ids below this value reserved */
 

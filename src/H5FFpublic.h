@@ -267,6 +267,17 @@ H5_DLL herr_t H5DOget(hid_t dataset_id, hid_t dxpl_id, const hsize_t coord[],hid
 H5_DLL herr_t H5DOget_ff(hid_t dataset_id, hid_t dxpl_id, const hsize_t coord[],hid_t memtype, 
                           void *buffer, hid_t rcxt_id, hid_t estack_id);
 
+H5_DLL herr_t H5Xcreate_ff(hid_t loc_id, unsigned plugin_id, hid_t xcpl_id,
+    hid_t trans_id, hid_t estack_id);
+H5_DLL herr_t H5Xremove_ff(hid_t loc_id, unsigned idx, hid_t trans_id,
+    hid_t estack_id);
+H5_DLL herr_t H5Xget_count_ff(hid_t loc_id, hsize_t *idx_count, hid_t rcxt_id,
+    hid_t estack_id);
+H5_DLL herr_t H5Pget_xapl_transaction(hid_t xapl_id, hid_t *trans_id);
+H5_DLL herr_t H5Pget_xapl_read_context(hid_t xapl_id, hid_t *rcxt_id);
+H5_DLL herr_t H5Pget_xxpl_transaction(hid_t xxpl_id, hid_t *trans_id);
+H5_DLL herr_t H5Pget_xxpl_read_context(hid_t xxpl_id, hid_t *rcxt_id);
+
 #endif /* H5_HAVE_EFF */
 
 #ifdef __cplusplus

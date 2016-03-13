@@ -134,6 +134,10 @@ H5X__init_package(void)
     if (H5X_register(H5X_FASTBIT) < 0)
         HGOTO_ERROR (H5E_PLINE, H5E_CANTINIT, FAIL, "unable to register FastBit index plugin");
 #endif
+#ifdef H5_HAVE_EFF
+    if (H5X_register(H5X_DUMMY_FF) < 0)
+        HGOTO_ERROR (H5E_PLINE, H5E_CANTINIT, FAIL, "unable to register dummy index plugin");
+#endif
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)

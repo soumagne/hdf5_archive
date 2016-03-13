@@ -2081,8 +2081,8 @@ H5Q__apply_object_data(H5G_loc_t *loc, const char *name, const H5O_info_t *oinfo
         HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a dataset");
 
     /* Query dataset */
-//    if (NULL == (dataspace = H5D_query(dataset, NULL, args->query, H5P_INDEX_ACCESS_DEFAULT, H5P_INDEX_XFER_DEFAULT)))
-//        HGOTO_ERROR(H5E_DATASET, H5E_CANTSELECT, FAIL, "can't query dataset");
+    if (NULL == (dataspace = H5D_query(dataset, NULL, args->query, H5P_INDEX_ACCESS_DEFAULT, H5P_INDEX_XFER_DEFAULT)))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTSELECT, FAIL, "can't query dataset");
 
     /* No element matched the query */
     if (H5S_SEL_NONE == H5S_get_select_type(dataspace))

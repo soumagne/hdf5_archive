@@ -226,17 +226,6 @@ H5Dwrite(hid_t dset_id, hid_t mem_type_id, hid_t mem_space_id,
         if(TRUE != H5P_isa_class(dxpl_id, H5P_DATASET_XFER))
             HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not xfer parms")
 
-    /* Call index pre_update if available */
-    if (dset->shared->idx_class) {
-        H5X_class_t *idx_class = dset->shared->idx_class;
-        void *idx_handle = dset->shared->idx_handle;
-        hid_t xxpl_id = H5P_INDEX_XFER_DEFAULT;
-
-        if (idx_class->pre_update &&
-                (FAIL == idx_class->pre_update(idx_handle, file_space_id, xxpl_id)))
-            HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "cannot do an index pre-update");
-    }
-
     /* Get the dataset transfer property list */
     if(NULL == (plist = (H5P_genplist_t *)H5I_object(dxpl_id)))
         HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a dataset transfer property list")
@@ -272,36 +261,6 @@ H5Dwrite(hid_t dset_id, hid_t mem_type_id, hid_t mem_space_id,
     if((ret_value = H5VL_dataset_write(dset->vol_obj, dset->vol_info->vol_cls, mem_type_id, mem_space_id, 
                                        file_space_id, dxpl_id, buf, H5_REQUEST_NULL)) < 0)
 	HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "can't write data")
-
-    /* Call index post_update if available */
-    if (dset->shared->idx_class) {
-        H5X_class_t *idx_class = dset->shared->idx_class;
-        void *idx_handle = dset->shared->idx_handle;
-        hid_t xxpl_id = H5P_INDEX_XFER_DEFAULT;
-
-        if (idx_class->post_update &&
-                (FAIL == idx_class->post_update(idx_handle, buf, file_space_id, xxpl_id)))
-            HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "cannot do an index post-update");
-
-        /* Calling post_update rebuilds the index and index metadata may need
-         * to be refreshed.
-         */
-        if (idx_class->refresh) {
-            H5O_idxinfo_t idx_info;
-            void *metadata;
-            size_t metadata_size;
-
-            if (FAIL == idx_class->refresh(idx_handle, &metadata_size, &metadata))
-                HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "cannot do an index refresh");
-
-            /* Write the index header message */
-            idx_info.plugin_id = idx_class->id;
-            idx_info.metadata_size = metadata_size;
-            idx_info.metadata = metadata;
-            if (H5O_msg_write(&dset->oloc, H5O_IDXINFO_ID, H5O_MSG_FLAG_CONSTANT, H5O_UPDATE_FORCE, &idx_info, H5AC_dxpl_id))
-                HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "unable to update index header message");
-        }
-    }
 
 done:
     FUNC_LEAVE_API(ret_value)

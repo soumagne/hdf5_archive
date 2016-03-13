@@ -253,7 +253,7 @@ H5O__dset_open(const H5G_loc_t *obj_loc, hid_t lapl_id, hid_t dxpl_id, hbool_t a
         HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to register dataset")
 
     /* Keep ID of the dataset */
-    dset->shared->dset_id = ret_value;
+//    dset->shared->dset_id = ret_value;
 
 done:
     if(ret_value < 0)

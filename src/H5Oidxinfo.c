@@ -312,7 +312,7 @@ H5O_idxinfo_delete(H5F_t *f, hid_t H5_ATTR_UNUSED dxpl_id, H5O_t *open_oh, void 
     HDassert(open_oh);
     HDassert(mesg);
 
-    file_id = H5F_get_file_id(f);
+    file_id = H5F_get_id(f, FALSE);
 
     /* call plugin index remove callback */
     if (NULL == (idx_class = H5X_registered(mesg->plugin_id)))

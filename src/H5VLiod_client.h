@@ -315,14 +315,12 @@ typedef struct H5VL_iod_write_info_t {
     hg_bulk_t *bulk_handle;
     hg_bulk_t *vl_len_bulk_handle;
     char *vl_lengths;
-#ifdef H5_HAVE_INDEXING
     H5VL_iod_dset_t *dset;
     void *idx_handle;
     unsigned idx_plugin_id;
     void *buf;
     hid_t dataspace_id;
     hid_t trans_id;
-#endif
 } H5VL_iod_write_info_t;
 
 /* list entry for dataset multi write info */
@@ -337,14 +335,12 @@ typedef struct H5VL_iod_multi_write_info_t {
     void *status;
     size_t count;
     H5VL_iod_multi_write_info_ent_t *list;
-#ifdef H5_HAVE_INDEXING
     H5VL_iod_dset_t *dset;
     void *idx_handle;
     unsigned idx_plugin_id;
     void *buf;
     hid_t dataspace_id;
     hid_t trans_id;
-#endif
 } H5VL_iod_multi_write_info_t;
 
 /* status of a read operation after it completes */

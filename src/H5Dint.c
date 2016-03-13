@@ -3265,7 +3265,7 @@ H5D_open_index(H5D_t *dset, hid_t xapl_id)
 
     HDassert(dset);
 
-    dset_id = dset->shared->dset_id;
+//    dset_id = dset->shared->dset_id;
     idx_class = dset->shared->idx_class;
     metadata_size = dset->shared->idx_info.metadata_size;
     metadata = dset->shared->idx_info.metadata;

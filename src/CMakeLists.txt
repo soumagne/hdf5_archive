@@ -655,13 +655,13 @@ IF (HDF5_ENABLE_EFF)
         ${HDF5_SRC_DIR}/H5FF_attr.c
         ${HDF5_SRC_DIR}/H5FF_obj.c
         ${HDF5_SRC_DIR}/H5FF_index.c
+        ${HDF5_SRC_DIR}/H5FF_index_dummy.c
         ${HDF5_SRC_DIR}/H5FF_query.c
         ${HDF5_SRC_DIR}/H5FF_ref.c
         ${HDF5_SRC_DIR}/H5M.c
         ${HDF5_SRC_DIR}/H5RC.c
         ${HDF5_SRC_DIR}/H5TR.c
         ${HDF5_SRC_DIR}/H5V.c
-#        ${HDF5_SRC_DIR}/H5Xdummy_ff.c
     )
     set (H5FF_HDRS
         ${HDF5_SRC_DIR}/H5ASpublic.h
@@ -720,13 +720,13 @@ set (H5X_SRCS
 if (ALACRITY_FOUND)
   set (H5X_SRCS
       ${H5X_SRCS}
-#      ${HDF5_SRC_DIR}/H5Xalacrity.c
+      ${HDF5_SRC_DIR}/H5Xalacrity.c
   )
 endif (ALACRITY_FOUND)
 if (FASTBIT_FOUND)
   set (H5X_SRCS
       ${H5X_SRCS}
-#      ${HDF5_SRC_DIR}/H5Xfastbit.c
+      ${HDF5_SRC_DIR}/H5Xfastbit.c
   )
 endif (FASTBIT_FOUND)
 set (H5X_HDRS

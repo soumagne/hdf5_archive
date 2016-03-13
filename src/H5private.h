@@ -2517,7 +2517,6 @@ H5_DLL int H5TR_term_package(void);
 H5_DLL int H5M_term_package(void);
 H5_DLL int H5M_top_term_package(void);
 H5_DLL int H5V_term_package(void);
-H5_DLL int H5X_term_package(void);
 
 /* Checksum functions */
 H5_DLL uint32_t H5_checksum_fletcher32(const void *data, size_t len);
