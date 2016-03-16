@@ -1847,7 +1847,7 @@ H5VL_iod_request_complete(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
         {
             int *status = (int *)req->data;
 
-            printf("Index info is now set\n");
+//            printf("Index info is now set\n");
             if(SUCCEED != *status) {
                 HERROR(H5E_FUNC, H5E_CANTINIT, "set_index_info failed at the server\n");
                 req->status = H5ES_STATUS_FAIL;
@@ -1873,9 +1873,9 @@ H5VL_iod_request_complete(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
                 unsigned plugin_id;
                 size_t count;
 
-                printf("Get index info ret is: %d\n", output->ret);
-                printf("Index count is: %ld\n", output->idx_count);
-                printf("Plugin ID is: %d\n", output->idx_plugin_id);
+//                printf("Get index info ret is: %d\n", output->ret);
+//                printf("Index count is: %ld\n", output->idx_count);
+//                printf("Plugin ID is: %d\n", output->idx_plugin_id);
 
                 count = output->idx_count;
                 /* MSC - for now, idx_plugin_count is always 1 */

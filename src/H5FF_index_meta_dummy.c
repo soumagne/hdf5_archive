@@ -39,6 +39,9 @@
 #define H5Q_FRIEND
 #include "H5Qpkg.h" /* To re-use H5Q_QUEUE */
 
+#define H5R_FRIEND
+#include "H5Rpkg.h" /* (Tmp) To re-use H5R__get_obj_name */
+
 extern const char *H5VL_iod_get_filename(H5VL_object_t *obj);
 
 /****************/
@@ -60,6 +63,21 @@ extern const char *H5VL_iod_get_filename(H5VL_object_t *obj);
 
 #define H5X_DUMMY_METADATA_TYPES 3
 #define H5X_DUMMY_MAX_NAME_LEN (64 * 1024)
+
+static void
+printf_ref(href_t ref)
+{
+    char obj_name[H5X_DUMMY_MAX_NAME_LEN];
+
+    H5R__get_obj_name(NULL, H5P_DEFAULT, H5P_DEFAULT, ref, obj_name, H5X_DUMMY_MAX_NAME_LEN);
+    if (H5Rget_type(ref) == H5R_EXT_ATTR) {
+        char attr_name[H5X_DUMMY_MAX_NAME_LEN];
+        H5R__get_attr_name(NULL, ref, attr_name, H5X_DUMMY_MAX_NAME_LEN);
+        H5X_DUMMY_LOG_DEBUG("Attribute reference: %s, %s", obj_name, attr_name);
+    } else {
+        H5X_DUMMY_LOG_DEBUG("Object reference: %s", obj_name);
+    }
+}
 
 /******************/
 /* Local Typedefs */
@@ -129,6 +147,9 @@ static herr_t H5X__dummy_index_attr_value_iterate(void *elem, hid_t type_id,
 static herr_t H5X__dummy_metadata_add(H5X_dummy_metadata_t *metadata,
     href_t ref, H5Q_type_t type, ...);
 static herr_t H5X__dummy_metadata_free(H5X_dummy_metadata_t *metadata);
+static herr_t H5X__dummy_metadata_add_entry(H5X_dummy_head_t *head,
+    H5X_dummy_entry_t *entry);
+static herr_t H5X__dummy_metadata_remove_entries(H5X_dummy_head_t *head);
 static herr_t H5X__dummy_metadata_write(H5X_dummy_metadata_t *metadata,
     hid_t loc_id, hid_t trans_id, size_t *plugin_metadata_size,
     void **plugin_metadata);
@@ -143,6 +164,11 @@ static herr_t H5X__dummy_index_rebuild(H5X_dummy_metadata_t *metadata,
     void *bufs[], size_t nelmts[], hid_t type_ids[]);
 static herr_t H5X__dummy_metadata_query(H5X_dummy_metadata_t *metadata,
     hid_t query_id, H5X_dummy_head_t *result);
+static herr_t H5X__dummy_metadata_query_singleton(H5X_dummy_metadata_t *metadata,
+    hid_t query_id, H5X_dummy_head_t *result);
+static herr_t H5X__dummy_metadata_query_combine(H5Q_combine_op_t combine_op,
+    H5X_dummy_head_t *result1, H5X_dummy_head_t *result2,
+    H5X_dummy_head_t *result);
 
 static void *H5X__dummy_create(hid_t loc_id, hid_t xcpl_id, hid_t xapl_id,
     size_t *metadata_size, void **metadata);
@@ -513,6 +539,8 @@ H5X__dummy_metadata_free(H5X_dummy_metadata_t *metadata)
             H5Rdestroy(entry->ref);
             switch (entry->type) {
                 case H5Q_TYPE_ATTR_VALUE:
+                    if (FAIL == H5Tclose(entry->key.elem.type))
+                        HGOTO_ERROR(H5E_DATATYPE, H5E_CANTCLOSEOBJ, FAIL, "unable to close datatype");
                     entry->key.elem.value = H5MM_xfree(entry->key.elem.value);
                 break;
                 case H5Q_TYPE_ATTR_NAME:
@@ -531,6 +559,44 @@ H5X__dummy_metadata_free(H5X_dummy_metadata_t *metadata)
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5X__dummy_metadata_free */
+
+static herr_t
+H5X__dummy_metadata_add_entry(H5X_dummy_head_t *head, H5X_dummy_entry_t *entry)
+{
+    H5X_dummy_entry_t *new_entry;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(head);
+    HDassert(entry);
+
+    if (NULL == (new_entry = (H5X_dummy_entry_t *) H5MM_malloc(sizeof(H5X_dummy_entry_t))))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTALLOC, FAIL, "can't allocate ref entry");
+    HDmemcpy(new_entry, entry, sizeof(H5X_dummy_entry_t));
+    H5Q_QUEUE_INSERT_TAIL(head, new_entry, entry);
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_metadata_add_entry */
+
+static herr_t
+H5X__dummy_metadata_remove_entries(H5X_dummy_head_t *head)
+{
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT_NOERR
+
+    HDassert(head);
+
+    while (!H5Q_QUEUE_EMPTY(head)) {
+        H5X_dummy_entry_t *entry = H5Q_QUEUE_FIRST(head);
+        H5Q_QUEUE_REMOVE_HEAD(head, entry);
+        H5MM_free(entry);
+    }
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_metadata_remove_entries */
 
 static herr_t
 H5X__dummy_metadata_write(H5X_dummy_metadata_t *metadata, hid_t file_id,
@@ -835,6 +901,25 @@ H5X__dummy_create(hid_t loc_id, hid_t H5_ATTR_UNUSED xcpl_id, hid_t xapl_id,
         &dummy->metadata, rcxt_id, H5_EVENT_STACK_NULL))
         HGOTO_ERROR(H5E_SYM, H5E_BADITER, NULL, "object visitation failed");
 
+    H5X_DUMMY_LOG_DEBUG("###########################");
+    if (!H5Q_QUEUE_EMPTY(&dummy->metadata.attr_names))
+        H5X_DUMMY_LOG_DEBUG("Indexed %zu attributes names", dummy->metadata.attr_names.n_elem);
+    if (!H5Q_QUEUE_EMPTY(&dummy->metadata.attr_values))
+        H5X_DUMMY_LOG_DEBUG("Indexed %zu attributes values", dummy->metadata.attr_values.n_elem);
+    if (!H5Q_QUEUE_EMPTY(&dummy->metadata.link_names))
+        H5X_DUMMY_LOG_DEBUG("Indexed %zu link names", dummy->metadata.link_names.n_elem);
+    H5X_dummy_entry_t *entry;
+    H5Q_QUEUE_FOREACH(entry, &dummy->metadata.attr_names, entry) {
+        H5X_DUMMY_LOG_DEBUG("Indexed attribute name: %s", (const char *) entry->key.name);
+    }
+    H5Q_QUEUE_FOREACH(entry, &dummy->metadata.attr_values, entry) {
+        H5X_DUMMY_LOG_DEBUG("Indexed attribute value: %d", *((int *) entry->key.elem.value));
+    }
+    H5Q_QUEUE_FOREACH(entry, &dummy->metadata.link_names, entry) {
+        H5X_DUMMY_LOG_DEBUG("Indexed link name: %s", (const char *) entry->key.name);
+    }
+    H5X_DUMMY_LOG_DEBUG("###########################");
+
     /* Write index metadata */
     if (FAIL == H5X__dummy_metadata_write(&dummy->metadata, file_id, trans_id,
         metadata_size, metadata))
@@ -964,8 +1049,9 @@ H5X__dummy_query(void *idx_handle, hid_t query_id, hid_t xxpl_id,
     size_t *ref_count, href_t *refs[])
 {
     H5X_dummy_t *dummy = (H5X_dummy_t *) idx_handle;
-    H5X_dummy_head_t query_result;
+    H5X_dummy_head_t query_result = H5Q_QUEUE_HEAD_INITIALIZER(query_result);
     hid_t rcxt_id;
+    href_t *ref_buf = NULL;
     herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
@@ -980,6 +1066,32 @@ H5X__dummy_query(void *idx_handle, hid_t query_id, hid_t xxpl_id,
     /* We assume here that the queries passed only operate on metadata */
     if (FAIL == H5X__dummy_metadata_query(&dummy->metadata, query_id, &query_result))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTCOMPARE, FAIL, "can't query metadata");
+
+
+    H5X_DUMMY_LOG_DEBUG("###########################");
+    if (!H5Q_QUEUE_EMPTY(&query_result)) {
+        H5X_dummy_entry_t *entry;
+        H5X_DUMMY_LOG_DEBUG("Query returns %zu references", query_result.n_elem);
+        H5Q_QUEUE_FOREACH(entry, &query_result, entry)
+            printf_ref(entry->ref);
+    }
+    H5X_DUMMY_LOG_DEBUG("###########################");
+
+    /* Fill result */
+    if (!H5Q_QUEUE_EMPTY(&query_result)) {
+        H5X_dummy_entry_t *entry;
+        int i = 0;
+
+        if (NULL == (ref_buf = H5MM_malloc(sizeof(href_t) * query_result.n_elem)))
+        HGOTO_ERROR(H5E_QUERY, H5E_NOSPACE, FAIL, "can't allocate read buffer");
+
+        H5Q_QUEUE_FOREACH(entry, &query_result, entry) {
+            ref_buf[i] = entry->ref;
+            i++;
+        }
+    }
+    *ref_count = query_result.n_elem;
+    *refs = ref_buf;
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -998,97 +1110,183 @@ H5X__dummy_metadata_query(H5X_dummy_metadata_t *metadata, hid_t query_id,
         HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get query type");
 
     if (query_type != H5Q_TYPE_MISC) {
-//        if (FAIL == H5X__dummy_metadata_query_singleton(metadata, query_id, result))
-//            HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to compare query");
+        if (FAIL == H5X__dummy_metadata_query_singleton(metadata, query_id, result))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to compare query");
     } else {
-        H5Q_combine_op_t op_type;
+        H5Q_combine_op_t combine_op;
         hid_t sub_query1_id, sub_query2_id;
-        H5X_dummy_head_t result1, result2;
+        H5X_dummy_head_t result1 = H5Q_QUEUE_HEAD_INITIALIZER(result1);
+        H5X_dummy_head_t result2 = H5Q_QUEUE_HEAD_INITIALIZER(result2);
 
-        if (FAIL == H5Qget_combine_op(query_id, &op_type))
+        if (FAIL == H5Qget_combine_op(query_id, &combine_op))
             HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get combine op");
         if (FAIL == H5Qget_components(query_id, &sub_query1_id, &sub_query2_id))
             HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get components");
 
-        if (FAIL == H5X__dummy_metadata_query(metadata, query_id, &result1))
-            HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
-        if (FAIL == H5X__dummy_metadata_query(metadata, query_id, &result2))
+        if (FAIL == H5X__dummy_metadata_query(metadata, sub_query1_id, &result1))
             HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
 
-//        if (FAIL == H5Q__view_combine(op_type, &view1, &view2, result1, result2,
-//                args->view, args->result))
-//            HGOTO_ERROR(H5E_QUERY, H5E_CANTMERGE, FAIL, "unable to merge results");
-//
-//        if (result1) H5Q__view_free(&view1);
-//        if (result2) H5Q__view_free(&view2);
+//        H5X_DUMMY_LOG_DEBUG("###########################");
+//        if (!H5Q_QUEUE_EMPTY(&result1)) {
+//            H5X_dummy_entry_t *entry;
+//            H5X_DUMMY_LOG_DEBUG("Query returns %zu references", result1.n_elem);
+//            H5Q_QUEUE_FOREACH(entry, &result1, entry)
+//                printf_ref(entry->ref);
+//        }
+//        H5X_DUMMY_LOG_DEBUG("###########################");
+
+        if (FAIL == H5X__dummy_metadata_query(metadata, sub_query2_id, &result2))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
+
+//        H5X_DUMMY_LOG_DEBUG("###########################");
+//        if (!H5Q_QUEUE_EMPTY(&result2)) {
+//            H5X_dummy_entry_t *entry;
+//            H5X_DUMMY_LOG_DEBUG("Query returns %zu references", result2.n_elem);
+//            H5Q_QUEUE_FOREACH(entry, &result2, entry)
+//                printf_ref(entry->ref);
+//        }
+//        H5X_DUMMY_LOG_DEBUG("###########################");
+
+        if (FAIL == H5X__dummy_metadata_query_combine(combine_op, &result1, &result2, result))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTMERGE, FAIL, "unable to merge results");
+
+//        H5X_DUMMY_LOG_DEBUG("###########################");
+//        if (!H5Q_QUEUE_EMPTY(result)) {
+//            H5X_dummy_entry_t *entry;
+//            H5X_DUMMY_LOG_DEBUG("Query returns %zu references", result->n_elem);
+//            H5Q_QUEUE_FOREACH(entry, result, entry)
+//                printf_ref(entry->ref);
+//        }
+//        H5X_DUMMY_LOG_DEBUG("###########################");
+
+        if (FAIL == H5X__dummy_metadata_remove_entries(&result1))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTFREE, FAIL, "unable to remove entries");
+        if (FAIL == H5X__dummy_metadata_remove_entries(&result2))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTFREE, FAIL, "unable to remove entries");
+        if (FAIL == H5Qclose(sub_query1_id))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTCLOSEOBJ, FAIL, "unable to close query");
+        if (FAIL == H5Qclose(sub_query2_id))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTCLOSEOBJ, FAIL, "unable to close query");
     }
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-}
+} /* end H5X__dummy_metadata_query */
 
 static herr_t
-H5X__dummy_query_combine_result(H5Q_combine_op_t combine_op,
-    H5X_dummy_head_t *result1, H5X_dummy_head_t *result2)
+H5X__dummy_metadata_query_singleton(H5X_dummy_metadata_t *metadata,
+    hid_t query_id, H5X_dummy_head_t *result)
 {
+    H5X_dummy_entry_t *entry;
+    H5Q_type_t query_type;
     herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    if ((combine_op == H5Q_COMBINE_AND) && ((result1 && result2))) {
-//        unsigned combine_result = (result1 > result2) ? result1 : result2;
-//
-//        H5Q_LOG_DEBUG("Result 1 (%x), result 2 (%x), combined result (%x)\n",
-//                result1, result2, combine_result);
-//
-//        *result = combine_result;
-//
-//        switch (combine_result) {
-//            case H5Q_REF_REG:
-//                /* Combined results are on the same object (here, dataset),
-//                 * therefore at this point only result1 or result2 has a region
-//                 * reference */
-//                if (result1 & H5Q_REF_REG)
-//                    H5Q_QUEUE_CONCAT(&view->reg_refs, &view1->reg_refs);
-//                else if (result2 & H5Q_REF_REG)
-//                    H5Q_QUEUE_CONCAT(&view->reg_refs, &view2->reg_refs);
-//                break;
-//            case H5Q_REF_OBJ:
-//                if (result1 & H5Q_REF_OBJ)
-//                    H5Q_QUEUE_CONCAT(&view->obj_refs, &view1->obj_refs);
-//                else if (result2 & H5Q_REF_OBJ)
-//                    H5Q_QUEUE_CONCAT(&view->obj_refs, &view2->obj_refs);
-//                break;
-//            case H5Q_REF_ATTR:
-//                /* TODO check that references are equal and keep refs equal, discard others*/
-//                if (result1 & H5Q_REF_ATTR)
-//                    H5Q_QUEUE_CONCAT(&view->attr_refs, &view1->attr_refs);
-//                else if (result2 & H5Q_REF_ATTR)
-//                    H5Q_QUEUE_CONCAT(&view->attr_refs, &view2->attr_refs);
-//                break;
-//            default:
-//                HGOTO_ERROR(H5E_QUERY, H5E_BADTYPE, FAIL, "unsupported/unrecognized query type");
-//                break;
-//        }
-    } else if ((combine_op == H5Q_COMBINE_OR) && ((result1 || result2))) {
-//        H5Q_ref_head_t *refs[H5Q_VIEW_REF_NTYPES] = { &view->reg_refs, &view->obj_refs, &view->attr_refs };
-//        H5Q_ref_head_t *refs1[H5Q_VIEW_REF_NTYPES] = { &view1->reg_refs, &view1->obj_refs, &view1->attr_refs };
-//        H5Q_ref_head_t *refs2[H5Q_VIEW_REF_NTYPES] = { &view2->reg_refs, &view2->obj_refs, &view2->attr_refs };
-//        unsigned combine_result = result1 | result2;
-//        int i;
-//
-//        H5Q_LOG_DEBUG("Result 1 (%x), result 2 (%x), combined result (%x)\n",
-//                result1, result2, combine_result);
-//
-//        *result = combine_result;
-//
-//        /* Simply concatenate results from sub-views */
-//        for (i = 0; i < H5Q_VIEW_REF_NTYPES; i++) {
-//            H5Q_QUEUE_CONCAT(refs[i], refs1[i]);
-//            H5Q_QUEUE_CONCAT(refs[i], refs2[i]);
-//        }
+    if (FAIL == H5Qget_type(query_id, &query_type))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get query type");
+    switch (query_type) {
+        case H5Q_TYPE_LINK_NAME:
+            H5Q_QUEUE_FOREACH(entry, &metadata->link_names, entry) {
+                hbool_t apply_result = FALSE;
+                if (FAIL == H5Qapply_atom(query_id, &apply_result, entry->key.name))
+                    HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "can't compare link name");
+                if (!apply_result) continue;
+
+//                H5X_DUMMY_LOG_DEBUG("Match link name: %s", (const char *) entry->key.name);
+                if (FAIL == H5X__dummy_metadata_add_entry(result, entry))
+                    HGOTO_ERROR(H5E_INDEX, H5E_CANTMERGE, FAIL, "unable to add result");
+            }
+            break;
+        case H5Q_TYPE_ATTR_NAME:
+            H5Q_QUEUE_FOREACH(entry, &metadata->attr_names, entry) {
+                hbool_t apply_result = FALSE;
+                if (FAIL == H5Qapply_atom(query_id, &apply_result, entry->key.name))
+                    HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "can't compare attribute name");
+                if (!apply_result) continue;
+
+//                H5X_DUMMY_LOG_DEBUG("Match attribute name: %s", (const char *) entry->key.name);
+                if (FAIL == H5X__dummy_metadata_add_entry(result, entry))
+                    HGOTO_ERROR(H5E_INDEX, H5E_CANTMERGE, FAIL, "unable to add result");
+            }
+            break;
+        case H5Q_TYPE_ATTR_VALUE:
+            H5Q_QUEUE_FOREACH(entry, &metadata->attr_values, entry) {
+                hbool_t apply_result = FALSE;
+                if (FAIL == H5Qapply_atom(query_id, &apply_result, entry->key.elem.type, entry->key.elem.value))
+                    HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "can't compare attribute values");
+                if (!apply_result) continue;
+
+//                H5X_DUMMY_LOG_DEBUG("Match attribute value: %d", *((int *) entry->key.elem.value));
+                if (FAIL == H5X__dummy_metadata_add_entry(result, entry))
+                    HGOTO_ERROR(H5E_INDEX, H5E_CANTMERGE, FAIL, "unable to add result");
+            }
+            break;
+        case H5Q_TYPE_DATA_ELEM:
+        case H5Q_TYPE_MISC:
+        default:
+            HGOTO_ERROR(H5E_QUERY, H5E_BADTYPE, FAIL, "unsupported/unrecognized query type");
+            break;
     }
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5Q__view_combine */
+} /* end H5X__dummy_metadata_query_singleton */
+
+static herr_t
+H5X__dummy_metadata_query_combine(H5Q_combine_op_t combine_op,
+    H5X_dummy_head_t *result1, H5X_dummy_head_t *result2, H5X_dummy_head_t *result)
+{
+    H5X_dummy_entry_t *entry1;
+    H5X_dummy_entry_t *entry2;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    if (combine_op == H5Q_COMBINE_AND) {
+        H5Q_QUEUE_FOREACH(entry1, result1, entry) {
+            H5R_type_t ref_type1 = H5Rget_type(entry1->ref);
+            H5Q_QUEUE_FOREACH(entry2, result2, entry) {
+                H5R_type_t ref_type2 = H5Rget_type(entry2->ref);
+
+                if (H5Requal(entry1->ref, entry2->ref)) {
+                    if (FAIL == H5X__dummy_metadata_add_entry(result, entry1))
+                        HGOTO_ERROR(H5E_INDEX, H5E_CANTMERGE, FAIL, "unable to add result");
+                }
+                else if (ref_type1 == H5R_EXT_ATTR && ref_type2 == H5R_EXT_OBJECT) {
+                    char obj_name1[H5X_DUMMY_MAX_NAME_LEN];
+                    char obj_name2[H5X_DUMMY_MAX_NAME_LEN];
+
+                    /* Only combine if obj_names are equal */
+                    H5R__get_obj_name(NULL, H5P_DEFAULT, H5P_DEFAULT, entry1->ref,
+                        obj_name1, H5X_DUMMY_MAX_NAME_LEN);
+                    H5R__get_obj_name(NULL, H5P_DEFAULT, H5P_DEFAULT, entry2->ref,
+                        obj_name2, H5X_DUMMY_MAX_NAME_LEN);
+                    if (0 == HDstrcmp(obj_name1, obj_name2))
+                        if (FAIL == H5X__dummy_metadata_add_entry(result, entry2))
+                            HGOTO_ERROR(H5E_INDEX, H5E_CANTMERGE, FAIL, "unable to add result");
+                }
+                else if (ref_type1 == H5R_EXT_OBJECT && ref_type2 == H5R_EXT_ATTR) {
+                    char obj_name1[H5X_DUMMY_MAX_NAME_LEN];
+                    char obj_name2[H5X_DUMMY_MAX_NAME_LEN];
+
+                    /* Only combine if obj_names are equal */
+                    H5R__get_obj_name(NULL, H5P_DEFAULT, H5P_DEFAULT, entry1->ref,
+                        obj_name1, H5X_DUMMY_MAX_NAME_LEN);
+                    H5R__get_obj_name(NULL, H5P_DEFAULT, H5P_DEFAULT, entry2->ref,
+                        obj_name2, H5X_DUMMY_MAX_NAME_LEN);
+                    if (0 == HDstrcmp(obj_name1, obj_name2))
+                        if (FAIL == H5X__dummy_metadata_add_entry(result, entry1))
+                            HGOTO_ERROR(H5E_INDEX, H5E_CANTMERGE, FAIL, "unable to add result");
+                }
+            }
+        }
+    } else if (combine_op == H5Q_COMBINE_OR) {
+        /* TODO might want to remove eventual duplicates */
+        H5Q_QUEUE_CONCAT(result, result1);
+        H5Q_QUEUE_CONCAT(result, result2);
+    }
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_metadata_query_combine */

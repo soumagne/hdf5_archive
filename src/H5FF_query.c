@@ -64,6 +64,25 @@ H5_DLL H5G_t *H5Q_apply_multi_ff(size_t loc_count, hid_t *loc_ids, const H5Q_t *
   } while (0)
 #endif
 
+#define H5R_FRIEND
+#include "H5Rpkg.h" /* (Tmp) To re-use H5R__get_obj_name */
+
+#define H5X_DUMMY_MAX_NAME_LEN (64 * 1024)
+static void
+printf_ref(href_t ref)
+{
+    char obj_name[H5X_DUMMY_MAX_NAME_LEN];
+
+    H5R__get_obj_name(NULL, H5P_DEFAULT, H5P_DEFAULT, ref, obj_name, H5X_DUMMY_MAX_NAME_LEN);
+    if (H5Rget_type(ref) == H5R_EXT_ATTR) {
+        char attr_name[H5X_DUMMY_MAX_NAME_LEN];
+        H5R__get_attr_name(NULL, ref, attr_name, H5X_DUMMY_MAX_NAME_LEN);
+        H5Q_LOG_DEBUG("Attribute reference: %s, %s", obj_name, attr_name);
+    } else {
+        H5Q_LOG_DEBUG("Object reference: %s", obj_name);
+    }
+}
+
 /******************/
 /* Local Typedefs */
 /******************/
@@ -206,7 +225,7 @@ H5Q_apply_ff(hid_t loc_id, const H5Q_t *query, unsigned *result,
     H5G_loc_t file_loc;
     hbool_t idx;
     size_t idx_ref_count;
-    href_t *idx_refs;
+    href_t *idx_refs = NULL;
     H5G_t *ret_value = NULL; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
@@ -221,9 +240,15 @@ H5Q_apply_ff(hid_t loc_id, const H5Q_t *query, unsigned *result,
     if (FAIL == H5Q__apply_index(loc_id, query, rcxt_id, &idx, &idx_ref_count, &idx_refs))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTCOMPARE, NULL, "unable to use metadata index");
     if (idx) {
+        int i;
         /* Create new view and init args */
-
-        /* result, view */
+        for (i = 0; i < idx_ref_count; i++) {
+            H5R_type_t ref_type = H5R_get_type(idx_refs[i]);
+            printf_ref(idx_refs[i]);
+            *result |= (ref_type == H5R_EXT_ATTR) ? H5Q_REF_ATTR : H5Q_REF_OBJ;
+            if (FAIL == H5Q__view_append(&view, ref_type, idx_refs[i]))
+                HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
+        }
     } else {
         H5Q_apply_arg_t args;
 
@@ -304,6 +329,7 @@ done:
 
     /* Free the view */
     H5Q__view_free(&view);
+    H5MM_free(idx_refs);
 
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5Q_apply() */
@@ -337,8 +363,12 @@ H5Q__apply_index(hid_t loc_id, const H5Q_t *query, hid_t rcxt_id, hbool_t *idx,
     if (FAIL == H5VL_iod_index_get(file->vol_obj, &idx_class, &idx_handle, NULL, NULL))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "cannot get index");
 
-    if (!idx_class)
+    if (!idx_class) {
+        *idx = FALSE;
         HGOTO_DONE(SUCCEED);
+    } else {
+        *idx = TRUE;
+    }
 
     /* Index associated to file so use it */
     if (NULL == idx_class->idx_class.metadata_class.query)
@@ -374,7 +404,7 @@ H5Q__apply_index(hid_t loc_id, const H5Q_t *query, hid_t rcxt_id, hbool_t *idx,
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-} /* H5Q__apply_check_index() */
+} /* H5Q__apply_index() */
 
 /*-------------------------------------------------------------------------
  * Function:    H5Q__apply_iterate

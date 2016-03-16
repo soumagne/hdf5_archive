@@ -593,7 +593,7 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
     /* Open the file in read-only */
     if ((file = H5Fopen_ff(filename, H5F_ACC_RDWR, fapl, &rcxt, estack)) < 0) FAIL_STACK_ERROR;
     H5RCget_version(rcxt, &version);
-    printf("Re-open %s version %d\n", filename, version);
+    printf("Re-opened %s version %d\n", filename, version);
 
     if (idx_plugin) {
         hid_t trans = H5I_BADID, trspl = H5I_BADID;
