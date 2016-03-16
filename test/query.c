@@ -33,10 +33,6 @@ const char *FILENAME[] = {
 #define MAX_NAME 64
 #define MULTI_NFILES 3
 
-#ifndef H5_HAVE_INDEXING
-#define H5X_PLUGIN_NONE 0
-#endif
-
 /* Create query */
 static hid_t
 test_query_create(void)
