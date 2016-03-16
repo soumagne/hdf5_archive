@@ -25,6 +25,7 @@ const char *FILENAME[] = {
     "query1",
     "query2",
     "query3",
+    "query_meta_dummy",
     NULL
 };
 
@@ -579,7 +580,7 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
     hid_t query = H5I_BADID;
     struct timeval t1, t2;
     uint64_t req_version, version;
-    hid_t rcxt = H5I_BADID, trans = H5I_BADID, trspl = H5I_BADID;
+    hid_t rcxt = H5I_BADID;
     unsigned result = 0;
 
     printf(" ...\n---\n");
@@ -594,50 +595,60 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
     H5RCget_version(rcxt, &version);
     printf("Re-open %s version %d\n", filename, version);
 
-    /* Create metadata index */
-    trans = H5TRcreate(file, rcxt, version + 1);
-    trspl = H5Pcreate(H5P_TR_START);
-    if (H5Pset_trspl_num_peers(trspl, (unsigned int) my_size) < 0)
-        FAIL_STACK_ERROR;
-    if (H5TRstart(trans, trspl, estack) < 0)
-        FAIL_STACK_ERROR;
-    if (H5Pclose(trspl) < 0)
-        FAIL_STACK_ERROR;
+    if (idx_plugin) {
+        hid_t trans = H5I_BADID, trspl = H5I_BADID;
 
-    if (H5Xcreate_ff(file, H5X_PLUGIN_META_DUMMY_FF, H5P_DEFAULT, trans, estack) < 0) FAIL_STACK_ERROR;
-    if (H5RCrelease(rcxt, estack) < 0) FAIL_STACK_ERROR;
-    if (H5RCclose(rcxt) < 0) FAIL_STACK_ERROR;
-    if (H5TRfinish(trans, H5P_DEFAULT, &rcxt, estack) < 0) FAIL_STACK_ERROR;
-    if (H5TRclose(trans) < 0) FAIL_STACK_ERROR;
+        /* Create metadata index */
+        trans = H5TRcreate(file, rcxt, version + 1);
+        trspl = H5Pcreate(H5P_TR_START);
+        if (H5Pset_trspl_num_peers(trspl, (unsigned int) my_size) < 0)
+            FAIL_STACK_ERROR;
+        if (H5TRstart(trans, trspl, estack) < 0)
+            FAIL_STACK_ERROR;
+        if (H5Pclose(trspl) < 0)
+            FAIL_STACK_ERROR;
 
-    printf("\nRegion query\n");
-    printf(  "------------\n");
+        if (H5Xcreate_ff(file, idx_plugin, H5P_DEFAULT, trans, estack) < 0) FAIL_STACK_ERROR;
+        if (H5RCrelease(rcxt, estack) < 0) FAIL_STACK_ERROR;
+        if (H5RCclose(rcxt) < 0) FAIL_STACK_ERROR;
+        if (H5TRfinish(trans, H5P_DEFAULT, &rcxt, estack) < 0) FAIL_STACK_ERROR;
+        if (H5TRclose(trans) < 0) FAIL_STACK_ERROR;
+    }
 
-    /* Test region query */
-    if ((query = test_query_create_type(H5R_DATASET_REGION)) < 0) FAIL_STACK_ERROR;
+    if (!idx_plugin) { /* For now only test metadata query with index */
+        printf("\nRegion query\n");
+        printf(  "------------\n");
 
-    HDgettimeofday(&t1, NULL);
+        /* Test region query */
+        if ((query = test_query_create_type(H5R_DATASET_REGION)) < 0) FAIL_STACK_ERROR;
 
-    if ((view = H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack)) < 0) FAIL_STACK_ERROR;
+        HDgettimeofday(&t1, NULL);
+        if ((view = H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack)) < 0) FAIL_STACK_ERROR;
+        HDgettimeofday(&t2, NULL);
 
-    HDgettimeofday(&t2, NULL);
+        printf("View creation time on region: %lf ms\n",
+                ((float) (t2.tv_sec - t1.tv_sec)) * 1000.0f
+                + ((float) (t2.tv_usec - t1.tv_usec)) / 1000.0f);
 
-    printf("View creation time on region: %lf ms\n",
-            ((float) (t2.tv_sec - t1.tv_sec)) * 1000.0f
-            + ((float) (t2.tv_usec - t1.tv_usec)) / 1000.0f);
+        if (!(result & H5Q_REF_REG)) FAIL_STACK_ERROR;
+        if (test_query_read_selection(1, &filename, &file, fapl, view, H5R_DATASET_REGION, &rcxt, estack) < 0) FAIL_STACK_ERROR;
 
-    if (!(result & H5Q_REF_REG)) FAIL_STACK_ERROR;
-    if (test_query_read_selection(1, &filename, &file, fapl, view, H5R_DATASET_REGION, &rcxt, estack) < 0) FAIL_STACK_ERROR;
-
-    if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
-    if (test_query_close(query)) FAIL_STACK_ERROR;
+        if (H5Gclose(view) < 0) FAIL_STACK_ERROR;
+        if (test_query_close(query)) FAIL_STACK_ERROR;
+    }
 
     printf("\nObject query\n");
     printf(  "------------\n");
 
     /* Test object query */
     if ((query = test_query_create_type(H5R_OBJECT)) < 0) FAIL_STACK_ERROR;
+    HDgettimeofday(&t1, NULL);
     if ((view = H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack)) < 0) FAIL_STACK_ERROR;
+    HDgettimeofday(&t2, NULL);
+
+    printf("View creation time on object: %lf ms\n",
+            ((float) (t2.tv_sec - t1.tv_sec)) * 1000.0f
+            + ((float) (t2.tv_usec - t1.tv_usec)) / 1000.0f);
 
     if (!(result & H5Q_REF_OBJ)) FAIL_STACK_ERROR;
     if (test_query_read_selection(1, &filename, &file, fapl, view, H5R_OBJECT, &rcxt, estack) < 0) FAIL_STACK_ERROR;
@@ -650,7 +661,13 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
 
     /* Test attribute query */
     if ((query = test_query_create_type(H5R_ATTR)) < 0) FAIL_STACK_ERROR;
+    HDgettimeofday(&t1, NULL);
     if ((view = H5Qapply_ff(file, query, &result, H5P_DEFAULT, rcxt, estack)) < 0) FAIL_STACK_ERROR;
+    HDgettimeofday(&t2, NULL);
+
+    printf("View creation time on attribute: %lf ms\n",
+            ((float) (t2.tv_sec - t1.tv_sec)) * 1000.0f
+            + ((float) (t2.tv_usec - t1.tv_usec)) / 1000.0f);
 
     if (!(result & H5Q_REF_ATTR)) FAIL_STACK_ERROR;
     if (test_query_read_selection(1, &filename, &file, fapl, view, H5R_ATTR, &rcxt, estack) < 0) FAIL_STACK_ERROR;
@@ -766,6 +783,7 @@ main(int argc, char *argv[])
     char filename_fastbit[MAX_NAME];
 #endif
     char **filename_multi = NULL;
+    char filename_meta_dummy[MAX_NAME];
     hid_t query = H5I_BADID, fapl = H5I_BADID;
     int i;
 
@@ -792,6 +810,7 @@ main(int argc, char *argv[])
     h5_fixname(FILENAME[2], fapl, filename_multi[0], MAX_NAME);
     h5_fixname(FILENAME[3], fapl, filename_multi[1], MAX_NAME);
     h5_fixname(FILENAME[4], fapl, filename_multi[2], MAX_NAME);
+    h5_fixname(FILENAME[5], fapl, filename_meta_dummy, sizeof(filename_meta_dummy));
 
     /* Check that no object is left open */
     H5Pset_fclose_degree(fapl, H5F_CLOSE_SEMI);
@@ -836,9 +855,15 @@ main(int argc, char *argv[])
     PASSED();
 #endif
 
-    TESTING("query apply view multiple (no index)");
+//    TESTING("query apply view multiple (no index)");
 
-    if (test_query_apply_view_multi(filename_multi, fapl, 0, H5_EVENT_STACK_NULL) < 0) FAIL_STACK_ERROR;
+//    if (test_query_apply_view_multi(filename_multi, fapl, 0, H5_EVENT_STACK_NULL) < 0) FAIL_STACK_ERROR;
+
+//    PASSED();
+
+    TESTING("query apply view (dummy metadata index)");
+
+    if (test_query_apply_view(filename_meta_dummy, fapl, H5X_PLUGIN_META_DUMMY_FF, H5_EVENT_STACK_NULL) < 0) FAIL_STACK_ERROR;
 
     PASSED();
 
