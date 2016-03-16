@@ -579,7 +579,7 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
     hid_t query = H5I_BADID;
     struct timeval t1, t2;
     uint64_t req_version, version;
-    hid_t rcxt = H5I_BADID;
+    hid_t rcxt = H5I_BADID, trans = H5I_BADID, trspl = H5I_BADID;
     unsigned result = 0;
 
     printf(" ...\n---\n");
@@ -590,9 +590,25 @@ test_query_apply_view(const char *filename, hid_t fapl, unsigned idx_plugin,
     if ((test_query_create_simple_file(filename, fapl, idx_plugin, req_version, estack)) < 0) FAIL_STACK_ERROR;
 
     /* Open the file in read-only */
-    if ((file = H5Fopen_ff(filename, H5F_ACC_RDONLY, fapl, &rcxt, estack)) < 0) FAIL_STACK_ERROR;
+    if ((file = H5Fopen_ff(filename, H5F_ACC_RDWR, fapl, &rcxt, estack)) < 0) FAIL_STACK_ERROR;
     H5RCget_version(rcxt, &version);
     printf("Re-open %s version %d\n", filename, version);
+
+    /* Create metadata index */
+    trans = H5TRcreate(file, rcxt, version + 1);
+    trspl = H5Pcreate(H5P_TR_START);
+    if (H5Pset_trspl_num_peers(trspl, (unsigned int) my_size) < 0)
+        FAIL_STACK_ERROR;
+    if (H5TRstart(trans, trspl, estack) < 0)
+        FAIL_STACK_ERROR;
+    if (H5Pclose(trspl) < 0)
+        FAIL_STACK_ERROR;
+
+    if (H5Xcreate_ff(file, H5X_PLUGIN_META_DUMMY_FF, H5P_DEFAULT, trans, estack) < 0) FAIL_STACK_ERROR;
+    if (H5RCrelease(rcxt, estack) < 0) FAIL_STACK_ERROR;
+    if (H5RCclose(rcxt) < 0) FAIL_STACK_ERROR;
+    if (H5TRfinish(trans, H5P_DEFAULT, &rcxt, estack) < 0) FAIL_STACK_ERROR;
+    if (H5TRclose(trans) < 0) FAIL_STACK_ERROR;
 
     printf("\nRegion query\n");
     printf(  "------------\n");

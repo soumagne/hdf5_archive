@@ -704,15 +704,11 @@ H5VL_iod_request_complete(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
 
             /* check whether index needs to be updated or not */
             if (info->idx_handle) {
-                H5X_class_t *idx_class = NULL;
+                H5X_class_t *idx_class = info->idx_class;
                 hid_t xxpl_id = H5P_INDEX_XFER_DEFAULT;
                 H5P_genplist_t *xxpl_plist; /* Property list pointer */
-                void *metadata;
-                size_t metadata_size;
 
-                /* Get the index plugin class */
-                if (NULL == (idx_class = H5X_registered(info->idx_plugin_id)))
-                    HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get index plugin class");
+                HDassert(idx_class);
 
                 /* Store the transaction ID in the xxpl */
                 if(NULL == (xxpl_plist = (H5P_genplist_t *)H5I_object(xxpl_id)))
@@ -721,18 +717,20 @@ H5VL_iod_request_complete(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
                     HGOTO_ERROR(H5E_PLIST, H5E_CANTGET, FAIL, "can't set property value for trans_id");
 
                 /* Call post_update */
-                if (NULL == idx_class->post_update)
+                if (NULL == idx_class->idx_class.data_class.post_update)
                     HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin post_update callback is not defined");
-                if (FAIL == idx_class->post_update(info->idx_handle,
+                if (FAIL == idx_class->idx_class.data_class.post_update(info->idx_handle,
                         info->buf, info->dataspace_id, xxpl_id))
                     HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "unable to issue index post_update operation");
 
                 /* Call refresh if available */
-                if (idx_class->refresh) {
-                    if (FAIL == idx_class->refresh(info->idx_handle, &metadata_size, &metadata))
+                if (idx_class->idx_class.data_class.refresh) {
+                    H5O_idxinfo_t idx_info;
+
+                    idx_info.plugin_id = idx_class->id;
+                    if (FAIL == idx_class->idx_class.data_class.refresh(info->idx_handle, &idx_info.metadata_size, &idx_info.metadata_size))
                         HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "unable to refresh metadata");
-                    if (FAIL == H5VL_iod_dataset_set_index_info(info->dset, info->idx_plugin_id,
-                            metadata_size, metadata, info->trans_id, NULL))
+                    if (FAIL == H5VL_iod_index_set_info(info->dset, &idx_info, info->trans_id, NULL))
                         HGOTO_ERROR(H5E_INDEX, H5E_CANTSET, FAIL, "cannot set index info to dataset");
                 }
             }
@@ -780,41 +778,6 @@ H5VL_iod_request_complete(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
             } /* end if */
 
             H5VL_iod_request_delete(file, req);
-
-            /* check whether index needs to be updated or not */
-            if (info->idx_handle) {
-                H5X_class_t *idx_class = NULL;
-                hid_t xxpl_id = H5P_INDEX_XFER_DEFAULT;
-                H5P_genplist_t *xxpl_plist; /* Property list pointer */
-                void *metadata;
-                size_t metadata_size;
-
-                /* Get the index plugin class */
-                if (NULL == (idx_class = H5X_registered(info->idx_plugin_id)))
-                    HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get index plugin class");
-
-                /* Store the transaction ID in the xxpl */
-                if(NULL == (xxpl_plist = (H5P_genplist_t *)H5I_object(xxpl_id)))
-                    HGOTO_ERROR(H5E_ATOM, H5E_BADATOM, FAIL, "can't find object for ID");
-                if(H5P_set(xxpl_plist, H5VL_TRANS_ID, &info->trans_id) < 0)
-                    HGOTO_ERROR(H5E_PLIST, H5E_CANTGET, FAIL, "can't set property value for trans_id");
-
-                /* Call post_update */
-                if (NULL == idx_class->post_update)
-                    HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin post_update callback is not defined");
-                if (FAIL == idx_class->post_update(info->idx_handle,
-                        info->buf, info->dataspace_id, xxpl_id))
-                    HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "unable to issue index post_update operation");
-
-                /* Call refresh if available */
-                if (idx_class->refresh) {
-                    if (FAIL == idx_class->refresh(info->idx_handle, &metadata_size, &metadata))
-                        HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "unable to refresh metadata");
-                    if (FAIL == H5VL_iod_dataset_set_index_info(info->dset, info->idx_plugin_id,
-                            metadata_size, metadata, info->trans_id, NULL))
-                        HGOTO_ERROR(H5E_INDEX, H5E_CANTSET, FAIL, "cannot set index info to dataset");
-                } /* end if */
-            } /* end if */
 
             for(i = 0; i < info->count; i++) {
                 if(info->list[i].vl_lengths) {
@@ -1880,7 +1843,7 @@ H5VL_iod_request_complete(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
             H5VL_iod_request_delete(file, req);
             break;
         }
-    case HG_DSET_SET_INDEX_INFO:
+    case HG_IDX_SET_INFO:
         {
             int *status = (int *)req->data;
 
@@ -1896,11 +1859,10 @@ H5VL_iod_request_complete(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
             H5VL_iod_request_delete(file, req);
             break;
         }
-    case HG_DSET_GET_INDEX_INFO:
+    case HG_IDX_GET_INFO:
         {
-            H5VL_iod_dataset_get_index_info_t *idx_info =
-                (H5VL_iod_dataset_get_index_info_t *)req->data;
-            dset_get_index_info_out_t *output = idx_info->output;
+            H5VL_iod_index_get_info_t *req_data = (H5VL_iod_index_get_info_t *)req->data;
+            idx_get_info_out_t *output = req_data->output;
 
             if(SUCCEED != output->ret) {
                 HERROR(H5E_FUNC, H5E_CANTINIT, "get_index_info failed at the server\n");
@@ -1919,16 +1881,13 @@ H5VL_iod_request_complete(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
                 /* MSC - for now, idx_plugin_count is always 1 */
                 HDassert(1 == count || 0 == count);
 
-                if (idx_info->count) 
-                    *idx_info->count = count;
+                if (req_data->count)
+                    *req_data->count = count;
 
-                if(0 == count) {
-                    if (idx_info->plugin_id) 
-                        *idx_info->plugin_id = H5X_PLUGIN_NONE;
-                    if (idx_info->metadata_size) 
-                        *idx_info->metadata_size = 0;
-                    if (idx_info->metadata) 
-                        *idx_info->metadata = NULL;
+                if(0 == count && req_data->idx_info) {
+                    req_data->idx_info->plugin_id = H5X_PLUGIN_NONE;
+                    req_data->idx_info->metadata_size = 0;
+                    req_data->idx_info->metadata = NULL;
                 }
                 if(1 == count) {
                     plugin_id = (unsigned) output->idx_plugin_id;
@@ -1937,23 +1896,17 @@ H5VL_iod_request_complete(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
                         req->status = H5ES_STATUS_FAIL;
                         req->state = H5VL_IOD_COMPLETED;
                     } else {
-                        size_t metadata_size = idx_info->output->idx_metadata.buf_size;
-                        void *metadata = idx_info->output->idx_metadata.buf;
-                        void *new_metadata;
+                        H5O_idxinfo_t idx_info;
 
-                        if (!metadata_size)
+                        idx_info.plugin_id = plugin_id;
+                        idx_info.metadata_size = output->idx_metadata.buf_size;
+                        idx_info.metadata = output->idx_metadata.buf;
+
+                        if (!idx_info.metadata_size)
                             HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "invalid metadata size");
 
-                        if (NULL == (new_metadata = H5MM_calloc(metadata_size)))
-                            HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, FAIL, "can't allocate metadata");
-                        HDmemcpy(new_metadata, metadata, metadata_size);
-
-                        if (idx_info->plugin_id) 
-                            *idx_info->plugin_id = plugin_id;
-                        if (idx_info->metadata_size) 
-                            *idx_info->metadata_size = metadata_size;
-                        if (idx_info->metadata) 
-                            *idx_info->metadata = new_metadata;
+                        if (req_data->idx_info && (NULL == H5O_msg_copy(H5O_IDXINFO_ID, &idx_info, req_data->idx_info)))
+                            HGOTO_ERROR(H5E_DATASET, H5E_CANTCOPY, FAIL, "unable to update copy message");
                     }
                 }
             }
@@ -1961,14 +1914,14 @@ H5VL_iod_request_complete(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
             if(HG_Request_free(*((hg_request_t *)req->req)) != HG_SUCCESS)
                 HGOTO_ERROR(H5E_SYM, H5E_CANTFREE, FAIL, "Can't Free Mercury Request");
 
-            output = (dset_get_index_info_out_t *)H5MM_xfree(output);
-            idx_info = (H5VL_iod_dataset_get_index_info_t *)H5MM_xfree(idx_info);
+            output = (idx_get_info_out_t *)H5MM_xfree(output);
+            req_data = (H5VL_iod_index_get_info_t *)H5MM_xfree(req_data);
             req->data = NULL;
             H5VL_iod_request_delete(file, req);
             HGOTO_DONE(ret_value);
-            //break;
+            break;
         }
-    case HG_DSET_RM_INDEX_INFO:
+    case HG_IDX_RM_INFO:
         {
             int *status = (int *)req->data;
 
@@ -2433,8 +2386,8 @@ H5VL_iod_request_cancel(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
     case HG_TR_SKIP:
     case HG_TR_ABORT:
     case HG_EVICT:
-    case HG_DSET_SET_INDEX_INFO:
-    case HG_DSET_RM_INDEX_INFO:
+    case HG_IDX_SET_INFO:
+    case HG_IDX_RM_INFO:
         {
             int *status = (int *)req->data;
 
@@ -2443,15 +2396,12 @@ H5VL_iod_request_cancel(H5VL_iod_file_t *file, H5VL_iod_request_t *req)
             H5VL_iod_request_delete(file, req);
             break;
         }
-    case HG_DSET_GET_INDEX_INFO:
+    case HG_IDX_GET_INFO:
         {
-            H5VL_iod_dataset_get_index_info_t *idx_info =
-                (H5VL_iod_dataset_get_index_info_t *)req->data;
-            dset_get_index_info_out_t *output = idx_info->output;
+            H5VL_iod_index_get_info_t *req_data = (H5VL_iod_index_get_info_t *)req->data;
 
-            output = (dset_get_index_info_out_t *)H5MM_xfree(output);
-            idx_info = (H5VL_iod_dataset_get_index_info_t *)H5MM_xfree(idx_info);
-            req->data = NULL;
+            req_data->output = (idx_get_info_out_t *)H5MM_xfree(req_data->output);
+            req->data = H5MM_xfree(req->data);
             H5VL_iod_request_delete(file, req);
             break;
         }

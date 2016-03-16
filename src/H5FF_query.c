@@ -89,6 +89,8 @@ typedef struct {
 /* Local Prototypes */
 /********************/
 
+static herr_t H5Q__apply_index(hid_t loc_id, const H5Q_t *query, hid_t rcxt_id,
+    hbool_t *idx, size_t *ref_count, href_t *refs[]);
 static herr_t H5Q__apply_iterate_ff(hid_t oid, const char *name,
     const H5O_ff_info_t *oinfo, void *udata, hid_t rcxt_id);
 static herr_t H5Q__apply_object_ff(hid_t oid, const char *name,
@@ -193,17 +195,19 @@ done:
  */
 H5G_t *
 H5Q_apply_ff(hid_t loc_id, const H5Q_t *query, unsigned *result,
-        hid_t H5_ATTR_UNUSED vcpl_id, hid_t rcxt_id)
+    hid_t H5_ATTR_UNUSED vcpl_id, hid_t rcxt_id)
 {
-    H5Q_apply_arg_t args;
     H5Q_view_t view = H5Q_VIEW_INITIALIZER(view); /* Resulting view */
     H5G_t *ret_grp = NULL; /* New group created */
-    H5G_t *ret_value = NULL; /* Return value */
     H5P_genclass_t *pclass = NULL;
     unsigned flags;
     hid_t fapl_id = FAIL;
     H5F_t *new_file = NULL;
     H5G_loc_t file_loc;
+    hbool_t idx;
+    size_t idx_ref_count;
+    href_t *idx_refs;
+    H5G_t *ret_value = NULL; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
@@ -213,14 +217,25 @@ H5Q_apply_ff(hid_t loc_id, const H5Q_t *query, unsigned *result,
     /* First check and optimize query */
     /* TODO */
 
-    /* Create new view and init args */
-    args.query = query;
-    args.result = result;
-    args.view = &view;
+    /* Use index if available */
+    if (FAIL == H5Q__apply_index(loc_id, query, rcxt_id, &idx, &idx_ref_count, &idx_refs))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTCOMPARE, NULL, "unable to use metadata index");
+    if (idx) {
+        /* Create new view and init args */
 
-    if (FAIL == H5Ovisit_ff(loc_id, H5_INDEX_NAME, H5_ITER_NATIVE, H5Q__apply_iterate_ff,
-            &args, rcxt_id, H5_EVENT_STACK_NULL))
-        HGOTO_ERROR(H5E_SYM, H5E_BADITER, NULL, "object visitation failed");
+        /* result, view */
+    } else {
+        H5Q_apply_arg_t args;
+
+        /* Create new view and init args */
+        args.query = query;
+        args.result = result;
+        args.view = &view;
+
+        if (FAIL == H5Ovisit_ff(loc_id, H5_INDEX_NAME, H5_ITER_NATIVE, H5Q__apply_iterate_ff,
+                &args, rcxt_id, H5_EVENT_STACK_NULL))
+            HGOTO_ERROR(H5E_SYM, H5E_BADITER, NULL, "object visitation failed");
+    }
 
     if (!H5Q_QUEUE_EMPTY(&view.reg_refs))
         H5Q_LOG_DEBUG("Number of reg refs: %zu\n", view.reg_refs.n_elem);
@@ -292,6 +307,74 @@ done:
 
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5Q_apply() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5Q__apply_index
+ *
+ * Purpose: Private function for H5Q_apply.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5Q__apply_index(hid_t loc_id, const H5Q_t *query, hid_t rcxt_id, hbool_t *idx,
+    size_t *ref_count, href_t *refs[])
+{
+    H5VL_object_t *file = NULL;
+    H5X_class_t *idx_class;
+    void *idx_handle;
+    H5P_genplist_t *xxpl_plist = NULL; /* Property list pointer */
+    hid_t xxpl_id = H5P_INDEX_XFER_DEFAULT;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    if (NULL == (file = H5I_object_verify(loc_id, H5I_FILE)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "loc_id is restricted to dataset");
+
+    /* Check for index */
+    if (FAIL == H5VL_iod_index_get(file->vol_obj, &idx_class, &idx_handle, NULL, NULL))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "cannot get index");
+
+    if (!idx_class)
+        HGOTO_DONE(SUCCEED);
+
+    /* Index associated to file so use it */
+    if (NULL == idx_class->idx_class.metadata_class.query)
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin query callback not defined");
+
+    /* Open index if not opened yet */
+    if (!idx_handle) {
+        H5P_genplist_t *xapl_plist; /* Property list pointer */
+        hid_t xapl_id = H5P_INDEX_ACCESS_DEFAULT;
+
+        /* Store the read context ID in the xapl */
+        if(NULL == (xapl_plist = (H5P_genplist_t *)H5I_object(xapl_id)))
+            HGOTO_ERROR(H5E_PLIST, H5E_NOTFOUND, FAIL, "property object doesn't exist");
+        if(H5P_set(xapl_plist, H5VL_CONTEXT_ID, &rcxt_id) < 0)
+            HGOTO_ERROR(H5E_PLIST, H5E_CANTGET, FAIL, "can't set property value for trans_id");
+
+        /* Open index */
+        if (FAIL == H5VL_iod_index_open(loc_id, file->vol_obj, xapl_id))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTOPENOBJ, FAIL, "cannot open index");
+        if (FAIL == H5VL_iod_index_get(file->vol_obj, &idx_class, &idx_handle, NULL, NULL))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "cannot get index");
+    }
+
+    /* Store the read context ID in the xxpl */
+    if(NULL == (xxpl_plist = (H5P_genplist_t *)H5I_object(H5P_INDEX_XFER_DEFAULT)))
+        HGOTO_ERROR(H5E_PLIST, H5E_NOTFOUND, FAIL, "property object doesn't exist");
+    if (H5P_set(xxpl_plist, H5VL_CONTEXT_ID, &rcxt_id) < 0)
+        HGOTO_ERROR(H5E_PLIST, H5E_CANTGET, FAIL, "can't set property value for trans_id");
+
+    /* Call query of index plugin */
+    if (FAIL == idx_class->idx_class.metadata_class.query(idx_handle, query->query_id, xxpl_id, ref_count, refs))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTSELECT, FAIL, "cannot query index");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* H5Q__apply_check_index() */
 
 /*-------------------------------------------------------------------------
  * Function:    H5Q__apply_iterate

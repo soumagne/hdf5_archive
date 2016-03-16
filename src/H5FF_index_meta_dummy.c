@@ -1,0 +1,1094 @@
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * Copyright by The HDF Group.                                               *
+ * All rights reserved.                                                      *
+ *                                                                           *
+ * This file is part of HDF5.  The full HDF5 copyright notice, including     *
+ * terms governing use, modification, and redistribution, is contained in    *
+ * the files COPYING and Copyright.html.  COPYING can be found at the root   *
+ * of the source code distribution tree; Copyright.html can be found at the  *
+ * root level of an installed copy of the electronic HDF5 document set and   *
+ * is linked from the top-level documents page.  It can also be found at     *
+ * http://hdfgroup.org/HDF5/doc/Copyright.html.  If you do not have          *
+ * access to either file, you may request a copy from help@hdfgroup.org.     *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+/*
+ * Purpose:	Dummy index routines.
+ */
+
+/****************/
+/* Module Setup */
+/****************/
+
+/***********/
+/* Headers */
+/***********/
+#include "H5private.h"          /* Generic Functions */
+#include "H5Xprivate.h"         /* Index */
+#include "H5Eprivate.h"         /* Error handling */
+#include "H5Iprivate.h"         /* IDs */
+#include "H5MMprivate.h"        /* Memory management */
+#include "H5Pprivate.h"
+#include "H5FFprivate.h"
+#include "H5RCprivate.h"
+#include "H5TRprivate.h"
+#include "H5Qprivate.h"
+#include "H5Sprivate.h"
+/* TODO using private headers but could use public ones */
+
+#define H5Q_FRIEND
+#include "H5Qpkg.h" /* To re-use H5Q_QUEUE */
+
+extern const char *H5VL_iod_get_filename(H5VL_object_t *obj);
+
+/****************/
+/* Local Macros */
+/****************/
+#define H5X_DUMMY_DEBUG
+
+#ifdef H5X_DUMMY_DEBUG
+#define H5X_DUMMY_LOG_DEBUG(...) do {                           \
+      fprintf(stdout, " # %s(): ", __func__);                   \
+      fprintf(stdout, __VA_ARGS__);                             \
+      fprintf(stdout, "\n");                                    \
+      fflush(stdout);                                           \
+  } while (0)
+#else
+#define H5X_DUMMY_LOG_DEBUG(...) do { \
+  } while (0)
+#endif
+
+#define H5X_DUMMY_METADATA_TYPES 3
+#define H5X_DUMMY_MAX_NAME_LEN (64 * 1024)
+
+/******************/
+/* Local Typedefs */
+/******************/
+
+typedef struct {
+    hid_t type;
+    void *value;
+} H5X_dummy_elem_t;
+
+typedef struct H5X_dummy_entry_t H5X_dummy_entry_t;
+
+struct H5X_dummy_entry_t {
+    H5Q_type_t type;            /* Query type */
+    union {                     /* Key */
+        H5X_dummy_elem_t elem;
+        char *name;
+    } key;
+    href_t ref;                 /* External reference */
+    H5Q_QUEUE_ENTRY(H5X_dummy_entry_t) entry;
+};
+
+typedef H5Q_QUEUE_HEAD(H5X_dummy_head_t, H5X_dummy_entry_t) H5X_dummy_head_t;
+
+typedef struct {
+    H5X_dummy_head_t attr_values;
+    H5X_dummy_head_t attr_names;
+    H5X_dummy_head_t link_names;
+} H5X_dummy_metadata_t;
+
+typedef struct {
+    const char *filename;
+    const char *loc_name;
+    H5X_dummy_metadata_t *metadata;
+} H5X_dummy_index_attr_arg_t;
+
+typedef struct {
+    H5X_dummy_index_attr_arg_t *attr_args;
+    const char *attr_name;
+} H5X_dummy_index_attr_elem_arg_t;
+
+typedef struct H5X_dummy_t {
+//    hid_t dataset_id;
+//    hid_t idx_anon_id;
+//    void *idx_token;
+//    size_t idx_token_size;
+    H5X_dummy_metadata_t metadata;
+} H5X_dummy_t;
+
+/********************/
+/* Local Prototypes */
+/********************/
+
+static herr_t H5X__dummy_index(hid_t oid, const char *name, const H5O_ff_info_t *oinfo,
+    void *udata, hid_t rcxt_id);
+static herr_t H5X__dummy_index_link_name(H5X_dummy_metadata_t *metadata, hid_t loc_id,
+    const char *name, const H5O_ff_info_t *oinfo);
+static herr_t H5X__dummy_index_attrs(H5X_dummy_metadata_t *metadata, hid_t loc_id,
+    const char *name, hid_t rcxt_id);
+static herr_t H5X__dummy_index_attr(hid_t loc_id, const char *attr_name,
+    const H5A_info_t H5_ATTR_UNUSED *ainfo, void *udata, hid_t rcxt_id);
+static herr_t H5X__dummy_index_attr_name(const char *attr_name, void *udata);
+static herr_t H5X__dummy_index_attr_value(hid_t loc_id, const char *attr_name,
+    void *udata, hid_t rcxt_id);
+static herr_t H5X__dummy_index_attr_value_iterate(void *elem, hid_t type_id,
+    unsigned ndim, const hsize_t *point, void *udata);
+static herr_t H5X__dummy_metadata_add(H5X_dummy_metadata_t *metadata,
+    href_t ref, H5Q_type_t type, ...);
+static herr_t H5X__dummy_metadata_free(H5X_dummy_metadata_t *metadata);
+static herr_t H5X__dummy_metadata_write(H5X_dummy_metadata_t *metadata,
+    hid_t loc_id, hid_t trans_id, size_t *plugin_metadata_size,
+    void **plugin_metadata);
+static herr_t H5X__dummy_metadata_read(hid_t loc_id,
+    size_t plugin_metadata_size, void *plugin_metadata,
+    H5X_dummy_metadata_t *metadata, hid_t rcxt_id);
+static herr_t H5X__dummy_serialize_metadata(hid_t dset_ids[], void *buf,
+    size_t *buf_size);
+static herr_t H5X__dummy_deserialize_metadata(hid_t file_id, void *buf,
+    size_t buf_size, hid_t *dset_ids[], hid_t rcxt_id);
+static herr_t H5X__dummy_index_rebuild(H5X_dummy_metadata_t *metadata,
+    void *bufs[], size_t nelmts[], hid_t type_ids[]);
+static herr_t H5X__dummy_metadata_query(H5X_dummy_metadata_t *metadata,
+    hid_t query_id, H5X_dummy_head_t *result);
+
+static void *H5X__dummy_create(hid_t loc_id, hid_t xcpl_id, hid_t xapl_id,
+    size_t *metadata_size, void **metadata);
+static herr_t H5X__dummy_remove(hid_t loc_id, size_t metadata_size,
+    void *metadata);
+static void *H5X__dummy_open(hid_t loc_id, hid_t xapl_id, size_t
+    metadata_size, void *metadata);
+static herr_t H5X__dummy_close(void *idx_handle);
+static herr_t H5X__dummy_query(void *idx_handle, hid_t query_id, hid_t xxpl_id,
+    size_t *ref_count, href_t *refs[]);
+
+/*********************/
+/* Package Variables */
+/*********************/
+
+/*****************************/
+/* Library Private Variables */
+/*****************************/
+
+/*******************/
+/* Local Variables */
+/*******************/
+
+/* Dummy index class */
+const H5X_class_t H5X_META_DUMMY_FF[1] = {{
+    H5X_CLASS_T_VERS,           /* (From the H5Xpublic.h header file) */
+    H5X_PLUGIN_META_DUMMY_FF,   /* (Or whatever number is assigned) */
+    "dummy index plugin",       /* Whatever name desired */
+    H5X_TYPE_METADATA,          /* This plugin operates on metadata */
+    {{
+    H5X__dummy_create,          /* create */
+    H5X__dummy_remove,          /* remove */
+    H5X__dummy_open,            /* open */
+    H5X__dummy_close,           /* close */
+    NULL,                       /* insert_entry */
+    NULL,                       /* remove_entry */
+    H5X__dummy_query,           /* query */
+    NULL                        /* get_size */
+    }}
+}};
+
+static herr_t
+H5X__dummy_index(hid_t oid, const char *name, const H5O_ff_info_t *oinfo,
+    void *udata, hid_t rcxt_id)
+{
+    H5X_dummy_metadata_t *metadata = (H5X_dummy_metadata_t *) udata;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(name);
+    HDassert(oinfo);
+    HDassert(metadata);
+
+    /* Index link names */
+    if (FAIL == H5X__dummy_index_link_name(metadata, oid, name, oinfo))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTAPPEND, FAIL, "can't add link name");
+
+    /* Index attribute names/values */
+    if (FAIL == H5X__dummy_index_attrs(metadata, oid, name, rcxt_id))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "can't apply data query to object");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_index */
+
+static herr_t
+H5X__dummy_index_link_name(H5X_dummy_metadata_t *metadata, hid_t loc_id,
+    const char *name, const H5O_ff_info_t *oinfo)
+{
+    href_t ref;
+    const char *link_name = NULL;
+    const char *trimmed_path = NULL;
+    const char *file_name = NULL;
+    H5VL_object_t *obj = NULL;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(metadata);
+    HDassert(name);
+    HDassert(oinfo);
+
+    trimmed_path = HDstrrchr(name, '/');
+    link_name = (trimmed_path) ? ++trimmed_path : name;
+
+    if ((oinfo->type != H5O_TYPE_GROUP) && (oinfo->type != H5O_TYPE_DATASET))
+        HGOTO_ERROR(H5E_QUERY, H5E_BADTYPE, FAIL, "unsupported/unrecognized object type");
+
+    /* Keep object reference */
+    if (NULL == (obj = (H5VL_object_t *) H5VL_get_object(loc_id)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid object/file identifier");
+    if (NULL == (file_name = H5VL_iod_get_filename(obj)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid file name");
+
+    if (NULL == (ref = H5R_create_ext_object(file_name, name)))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTCREATE, FAIL, "can't create object reference");
+    if (FAIL == H5X__dummy_metadata_add(metadata, ref, H5Q_TYPE_LINK_NAME, link_name))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_index_link_name */
+
+static herr_t
+H5X__dummy_index_attrs(H5X_dummy_metadata_t *metadata, hid_t loc_id,
+    const char *name, hid_t rcxt_id)
+{
+    H5X_dummy_index_attr_arg_t attr_args;
+    hid_t obj_id = FAIL;
+    const char *file_name = NULL;
+    H5VL_object_t *obj = NULL;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(metadata);
+    HDassert(name);
+
+    /* Build attribute operator info */
+    if (NULL == (obj = (H5VL_object_t *) H5VL_get_object(loc_id)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid object/file identifier");
+    if (NULL == (file_name = H5VL_iod_get_filename(obj)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid file name");
+
+    attr_args.filename = file_name;
+    attr_args.loc_name = name;
+    attr_args.metadata = metadata;
+
+    if (0 == HDstrcmp(name, ".")) {
+        obj_id = loc_id;
+    } else {
+        if (FAIL == (obj_id = H5Oopen_ff(loc_id, name, H5P_DEFAULT, rcxt_id)))
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTOPENOBJ, FAIL, "can't open object");
+    }
+
+    /* Iterate over attributes */
+    if (FAIL == (ret_value = H5Aiterate_ff(obj_id, H5_INDEX_NAME, H5_ITER_NATIVE,
+        NULL, H5X__dummy_index_attr, &attr_args, rcxt_id, H5_EVENT_STACK_NULL)))
+        HGOTO_ERROR(H5E_ATTR, H5E_BADITER, FAIL, "error iterating over attributes");
+
+done:
+    if ((obj_id != FAIL) && (obj_id != loc_id) && (FAIL == H5Oclose_ff(obj_id, H5_EVENT_STACK_NULL)))
+        HDONE_ERROR(H5E_OHDR, H5E_CANTRELEASE, FAIL, "unable to close object")
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_index_attrs */
+
+static herr_t
+H5X__dummy_index_attr(hid_t loc_id, const char *attr_name,
+    const H5A_info_t H5_ATTR_UNUSED *ainfo, void *udata, hid_t rcxt_id)
+{
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(attr_name);
+    HDassert(udata);
+
+    if (FAIL == H5X__dummy_index_attr_name(attr_name, udata))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "can't apply attr name query to object");
+
+    if (FAIL == H5X__dummy_index_attr_value(loc_id, attr_name, udata, rcxt_id))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "can't apply attr name query to object");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_index_attr */
+
+static herr_t
+H5X__dummy_index_attr_name(const char *attr_name, void *udata)
+{
+    H5X_dummy_index_attr_arg_t *args = (H5X_dummy_index_attr_arg_t *) udata;
+    href_t ref;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(attr_name);
+    HDassert(args);
+
+    /* Keep attribute reference */
+    if (NULL == (ref = H5R_create_ext_attr(args->filename, args->loc_name, attr_name)))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't get buffer size for attribute reference");
+    if (FAIL == H5X__dummy_metadata_add(args->metadata, ref, H5Q_TYPE_ATTR_NAME, attr_name))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_index_attr_name */
+
+static herr_t
+H5X__dummy_index_attr_value(hid_t loc_id, const char *attr_name, void *udata,
+    hid_t rcxt_id)
+{
+    H5X_dummy_index_attr_arg_t *args = (H5X_dummy_index_attr_arg_t *) udata;
+    void *buf = NULL;
+    size_t buf_size;
+    hid_t attr_id = FAIL;
+    hid_t type_id = FAIL;
+    hid_t space_id = FAIL;
+    size_t nelmts, elmt_size;
+    H5X_dummy_index_attr_elem_arg_t iter_args;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(attr_name);
+    HDassert(args);
+
+    /* Open attribute */
+    if (FAIL == (attr_id = H5Aopen_ff(loc_id, attr_name, H5P_DEFAULT, rcxt_id, H5_EVENT_STACK_NULL)))
+        HGOTO_ERROR(H5E_ATTR, H5E_CANTOPENOBJ, FAIL, "can't open attribute");
+
+    /* Get attribute info */
+    if (FAIL == (type_id = H5Aget_type(attr_id)))
+        HGOTO_ERROR(H5E_OHDR, H5E_CANTGET, FAIL, "can't get attribute datatype");
+    if (FAIL == (space_id = H5Aget_space(attr_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get attribute dataspace");
+    if (0 == (nelmts = (size_t) H5Sget_select_npoints(space_id)))
+        HGOTO_ERROR(H5E_DATASPACE, H5E_BADVALUE, FAIL, "invalid number of elements");
+    if (0 == (elmt_size = H5Tget_size(type_id)))
+        HGOTO_ERROR(H5E_DATATYPE, H5E_BADTYPE, FAIL, "invalid size of element");
+
+    /* Allocate buffer to hold data */
+    buf_size = nelmts * elmt_size;
+    if (NULL == (buf = H5MM_malloc(buf_size)))
+        HGOTO_ERROR(H5E_QUERY, H5E_NOSPACE, FAIL, "can't allocate read buffer");
+
+    /* Read data */
+    if (FAIL == H5Aread_ff(attr_id, type_id, buf, rcxt_id, H5_EVENT_STACK_NULL))
+        HGOTO_ERROR(H5E_ATTR, H5E_READERROR, FAIL, "unable to read attribute");
+
+    iter_args.attr_args = args;
+    iter_args.attr_name = attr_name;
+
+    /* Iterate over attribute elements to compare values */
+    if (FAIL == H5Diterate(buf, type_id, space_id, H5X__dummy_index_attr_value_iterate, &iter_args))
+        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOMPARE, FAIL, "unable to compare attribute elements");
+
+done:
+    H5MM_free(buf);
+    if (attr_id != FAIL) H5Aclose_ff(attr_id, H5_EVENT_STACK_NULL);
+    if (type_id != FAIL) H5Tclose(type_id);
+    if (space_id != FAIL) H5Sclose(space_id);
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_index_attr_value */
+
+static herr_t
+H5X__dummy_index_attr_value_iterate(void *elem, hid_t type_id,
+    unsigned H5_ATTR_UNUSED ndim, const hsize_t H5_ATTR_UNUSED *point, void *udata)
+{
+    H5X_dummy_index_attr_elem_arg_t *args = (H5X_dummy_index_attr_elem_arg_t *) udata;
+    href_t ref;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(elem);
+    HDassert(args);
+
+    /* Keep attribute reference */
+    if (NULL == (ref = H5R_create_ext_attr(args->attr_args->filename, args->attr_args->loc_name, args->attr_name)))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't get buffer size for attribute reference");
+    if (FAIL == H5X__dummy_metadata_add(args->attr_args->metadata, ref, H5Q_TYPE_ATTR_VALUE, type_id, elem))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_index_attr_value_iterate */
+
+static herr_t
+H5X__dummy_metadata_add(H5X_dummy_metadata_t *metadata, href_t ref, H5Q_type_t type, ...)
+{
+    va_list ap;
+    H5X_dummy_entry_t *entry;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(metadata);
+    HDassert(ref);
+
+    va_start(ap, type);
+
+    if (NULL == (entry = (H5X_dummy_entry_t *) H5MM_malloc(sizeof(H5X_dummy_entry_t))))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTALLOC, FAIL, "can't allocate ref entry");
+    entry->ref = ref;
+    entry->type = type;
+
+    switch (type) {
+        case H5Q_TYPE_ATTR_VALUE:
+        {
+            hid_t datatype_id;
+            size_t datatype_size;
+            const void *value;
+
+            /* Get arguments */
+            datatype_id = va_arg(ap, hid_t);
+            value = va_arg(ap, const void *);
+
+            HDassert(datatype_id != FAIL);
+            HDassert(value);
+
+            if (FAIL == (entry->key.elem.type = H5Tget_native_type(datatype_id, H5T_DIR_DEFAULT)))
+                HGOTO_ERROR(H5E_DATATYPE, H5E_CANTCOPY, FAIL, "can't copy attribute type");
+            if (0 == (datatype_size = H5Tget_size(entry->key.elem.type)))
+                HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a valid size");
+            if (NULL == (entry->key.elem.value = H5MM_malloc(datatype_size)))
+                HGOTO_ERROR(H5E_QUERY, H5E_CANTALLOC, FAIL, "can't allocate value buffer");
+            HDmemcpy(entry->key.elem.value, value, datatype_size);
+            H5Q_QUEUE_INSERT_TAIL(&metadata->attr_values, entry, entry);
+        }
+        break;
+        case H5Q_TYPE_ATTR_NAME:
+        {
+            const char *attr_name;
+
+            /* Get arguments */
+            attr_name = va_arg(ap, const char *);
+
+            HDassert(attr_name);
+
+            entry->key.name = H5MM_strdup(attr_name);
+            H5Q_QUEUE_INSERT_TAIL(&metadata->attr_names, entry, entry);
+        }
+        break;
+        case H5Q_TYPE_LINK_NAME:
+        {
+            const char *link_name;
+
+            /* Get arguments */
+            link_name = va_arg(ap, const char *);
+
+            HDassert(link_name);
+
+            entry->key.name = H5MM_strdup(link_name);
+            H5Q_QUEUE_INSERT_TAIL(&metadata->link_names, entry, entry);
+        }
+        break;
+        case H5Q_TYPE_MISC:
+        default:
+            HGOTO_ERROR(H5E_QUERY, H5E_BADTYPE, FAIL, "unsupported/unrecognized query type");
+            break;
+    }
+
+done:
+    va_end(ap);
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_metadata_add */
+
+static herr_t
+H5X__dummy_metadata_free(H5X_dummy_metadata_t *metadata)
+{
+    H5X_dummy_head_t *entries[H5X_DUMMY_METADATA_TYPES] = { &metadata->attr_names,
+        &metadata->attr_values, &metadata->link_names };
+    herr_t ret_value = SUCCEED; /* Return value */
+    int i;
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    for (i = 0; i < H5X_DUMMY_METADATA_TYPES; i++) {
+        while (!H5Q_QUEUE_EMPTY(entries[i])) {
+            H5X_dummy_entry_t *entry = H5Q_QUEUE_FIRST(entries[i]);
+            H5Q_QUEUE_REMOVE_HEAD(entries[i], entry);
+            /* TODO call H5Rdestroy */
+            H5Rdestroy(entry->ref);
+            switch (entry->type) {
+                case H5Q_TYPE_ATTR_VALUE:
+                    entry->key.elem.value = H5MM_xfree(entry->key.elem.value);
+                break;
+                case H5Q_TYPE_ATTR_NAME:
+                case H5Q_TYPE_LINK_NAME:
+                    entry->key.name = H5MM_xfree(entry->key.name);
+                break;
+                case H5Q_TYPE_MISC:
+                default:
+                    HGOTO_ERROR(H5E_QUERY, H5E_BADTYPE, FAIL, "unsupported/unrecognized query type");
+                    break;
+            }
+            H5MM_free(entry);
+        }
+    }
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_metadata_free */
+
+static herr_t
+H5X__dummy_metadata_write(H5X_dummy_metadata_t *metadata, hid_t file_id,
+    hid_t trans_id, size_t *plugin_metadata_size, void **plugin_metadata)
+{
+    hid_t dset_ids[H5X_DUMMY_METADATA_TYPES] = {FAIL, FAIL, FAIL};
+    hid_t mem_space_id = FAIL;
+    hid_t space_id = FAIL;
+    H5X_dummy_head_t *entries[H5X_DUMMY_METADATA_TYPES] = { &metadata->attr_names,
+        &metadata->attr_values, &metadata->link_names };
+    hid_t type_ids[H5X_DUMMY_METADATA_TYPES] = { H5T_STD_REF_EXT_ATTR,
+        FAIL, H5T_STD_REF_EXT_OBJ };
+    herr_t ret_value = SUCCEED; /* Return value */
+    int i;
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    /* Iterate over reference types and write references if any */
+    /* We only need to store attribute/object references and attribute values */
+    for (i = 0; i < H5X_DUMMY_METADATA_TYPES; i++) {
+        H5X_dummy_entry_t *entry = NULL;
+        hsize_t n_elem = entries[i]->n_elem;
+        hsize_t start = 0;
+
+        if (!n_elem)
+            continue;
+
+        /* Create dataspace */
+        if (FAIL == (space_id = H5Screate_simple(1, &n_elem, NULL)))
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, FAIL, "unable to create dataspace");
+
+        /* Create the new dataset & get its ID */
+        if (H5Q_QUEUE_FIRST(entries[i])->type == H5Q_TYPE_ATTR_VALUE)
+            type_ids[i] = H5Q_QUEUE_FIRST(entries[i])->key.elem.type;
+        if (FAIL == (dset_ids[i] = H5Dcreate_anon_ff(file_id, type_ids[i],
+            space_id, H5P_DEFAULT, H5P_DEFAULT, trans_id, H5_EVENT_STACK_NULL)))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTCREATE, FAIL, "can't create anonymous dataset");
+
+        /* Iterate over reference entries in view */
+        H5Q_QUEUE_FOREACH(entry, entries[i], entry) {
+            hsize_t count = 1;
+            const void *buf = (entry->type == H5Q_TYPE_ATTR_VALUE) ? entry->key.elem.value : &entry->ref;
+
+            if (FAIL == (mem_space_id = H5Screate_simple(1, &count, NULL)))
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, FAIL, "unable to create dataspace");
+            if (FAIL == H5Sselect_hyperslab(space_id, H5S_SELECT_SET, &start, NULL, &count, NULL))
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTINIT, FAIL, "unable to set hyperslab selection")
+            if (FAIL == H5Dwrite_ff(dset_ids[i], type_ids[i], mem_space_id,
+                space_id, H5P_DEFAULT, buf, trans_id, H5_EVENT_STACK_NULL))
+                HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "unable to write dataset");
+            if (FAIL == H5Sclose(mem_space_id))
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataspace");
+            mem_space_id = FAIL;
+
+            /* Increment reference position in file */
+            start++;
+        }
+        if (FAIL == H5Sclose(space_id))
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataspace");
+        space_id = FAIL;
+    }
+
+    /* Serialize metadata */
+    if (FAIL == H5X__dummy_serialize_metadata(dset_ids, NULL, plugin_metadata_size))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get plugin metadata size");
+    if (NULL == (*plugin_metadata = H5MM_malloc(*plugin_metadata_size)))
+        HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, FAIL, "can't allocate plugin metadata");
+    if (FAIL == H5X__dummy_serialize_metadata(dset_ids, *plugin_metadata, plugin_metadata_size))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTENCODE, FAIL, "can't serialize plugin metadata");
+
+    for (i = 0; i < H5X_DUMMY_METADATA_TYPES; i++) {
+        if (FAIL == H5Dclose_ff(dset_ids[i], H5_EVENT_STACK_NULL))
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataset");
+    }
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_metadata_write */
+
+
+static herr_t
+H5X__dummy_metadata_read(hid_t file_id, size_t plugin_metadata_size,
+    void *plugin_metadata, H5X_dummy_metadata_t *metadata, hid_t rcxt_id)
+{
+    hid_t *dset_ids;
+    herr_t ret_value = SUCCEED; /* Return value */
+    void *bufs[H5X_DUMMY_METADATA_TYPES];
+    size_t nelmts[H5X_DUMMY_METADATA_TYPES];
+    hid_t type_ids[H5X_DUMMY_METADATA_TYPES];
+    int i;
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    /* Deserialize metadata and get anon dataset IDs */
+    if (FAIL == H5X__dummy_deserialize_metadata(file_id, plugin_metadata, plugin_metadata_size,
+        &dset_ids, rcxt_id))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTDECODE, FAIL, "can't deserialize plugin metadata");
+
+    /* Iterate over metadata index types */
+    for (i = 0; i < H5X_DUMMY_METADATA_TYPES; i++) {
+        hid_t type_id = FAIL, space_id = FAIL;
+        size_t elmt_size;
+
+        if (FAIL == (type_id = H5Dget_type(dset_ids[i])))
+            HGOTO_ERROR(H5E_DATATYPE, H5E_CANTGET, FAIL, "unable to get datatype");
+        if (FAIL == (space_id = H5Dget_space(dset_ids[i])))
+            HGOTO_ERROR(H5E_DATATYPE, H5E_CANTGET, FAIL, "unable to get datatype");
+        if (0 == (nelmts[i] = (size_t) H5Sget_select_npoints(space_id)))
+            HGOTO_ERROR(H5E_DATASPACE, H5E_BADVALUE, FAIL, "invalid number of elements");
+        if (0 == (elmt_size = H5Tget_size(type_id)))
+            HGOTO_ERROR(H5E_DATATYPE, H5E_BADTYPE, FAIL, "invalid size of element");
+
+        /* Allocate buffer to hold data */
+        if (NULL == (bufs[i] = H5MM_malloc(nelmts[i] * elmt_size)))
+            HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, FAIL, "can't allocate read buffer");
+
+        /* Read data from dataset */
+        if (FAIL == H5Dread_ff(dset_ids[i], type_id, H5S_ALL, space_id,
+                H5P_DEFAULT, bufs[i], rcxt_id, H5_EVENT_STACK_NULL))
+            HGOTO_ERROR(H5E_INDEX, H5E_READERROR, FAIL, "can't read index data");
+
+        if (FAIL == H5Sclose(space_id))
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataspace");
+    }
+
+    /* Rebuild metadata index */
+    if (FAIL == H5X__dummy_index_rebuild(metadata, bufs, nelmts, type_ids))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTINIT, FAIL, "unable to rebuild metadata index");
+
+    /* Close anon datasets */
+    for (i = 0; i < H5X_DUMMY_METADATA_TYPES; i++) {
+        H5MM_free(bufs[i]);
+        if (FAIL == H5Tclose(type_ids[i]))
+            HGOTO_ERROR(H5E_DATATYPE, H5E_CANTCLOSEOBJ, FAIL, "unable to close datatype");
+        if (FAIL == H5Dclose_ff(dset_ids[i], H5_EVENT_STACK_NULL))
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTCLOSEOBJ, FAIL, "unable to close dataset");
+    }
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_metadata_read */
+
+static herr_t
+H5X__dummy_serialize_metadata(hid_t dset_ids[], void *buf, size_t *buf_size)
+{
+    uint8_t *p = buf;
+    size_t metadata_size = 3 * sizeof(uint64_t);
+    int i;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    for (i = 0; i < H5X_DUMMY_METADATA_TYPES; i++) {
+        size_t token_size;
+
+        /* Get token size */
+        if (FAIL == H5Oget_token(dset_ids[i], NULL, &token_size))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get token size for anonymous dataset");
+        metadata_size += token_size;
+
+        /* Encode metadata token info */
+        if (p) {
+            UINT64ENCODE(p, token_size);
+            if (FAIL == H5Oget_token(dset_ids[i], p, &token_size))
+                HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get token for anonymous dataset");
+            p += token_size;
+        }
+    }
+
+    if (buf_size) *buf_size = metadata_size;
+
+ done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_serialize_metadata */
+
+static herr_t
+H5X__dummy_deserialize_metadata(hid_t file_id, void *buf, size_t buf_size,
+    hid_t *dset_ids[], hid_t rcxt_id)
+{
+    uint8_t *p = buf;
+    hid_t trans_id;
+    uint64_t c_version;
+    int i;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(buf);
+    HDassert(buf_size);
+    HDassert(dset_ids);
+
+    /* TODO do that like this for now */
+    H5RCget_version(rcxt_id, &c_version);
+    trans_id = H5TRcreate(file_id, rcxt_id, c_version);
+
+    for (i = 0; i < H5X_DUMMY_METADATA_TYPES; i++) {
+        size_t token_size;
+
+        /* Get token size */
+        UINT64DECODE(p, token_size);
+
+        /* Decode index token info */
+        if (FAIL == (*dset_ids[i] = H5Oopen_by_token(p, trans_id, H5_EVENT_STACK_NULL)))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTOPENOBJ, FAIL, "can't open anonymous dataset");
+        p += token_size;
+    }
+
+done:
+    if (FAIL != trans_id) H5TRclose(trans_id);
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* H5X__dummy_deserialize_metadata */
+
+static herr_t
+H5X__dummy_index_rebuild(H5X_dummy_metadata_t *metadata, void *bufs[],
+    size_t nelmts[], hid_t type_ids[])
+{
+//    H5X_dummy_head_t *entries[H5X_DUMMY_METADATA_TYPES] = { &metadata->attr_names,
+//        &metadata->attr_values, &metadata->link_names };
+    href_t *link_refs;
+    href_t *attr_refs;
+    void **attr_values;
+    hid_t attr_native_id;
+//    int i;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT_NOERR
+
+    HDassert(metadata);
+    HDassert(bufs);
+    HDassert(nelmts);
+    HDassert(type_ids);
+
+    attr_refs = bufs[0];
+    attr_values = bufs[1];
+    link_refs = bufs[2];
+    attr_native_id = H5Tget_native_type(type_ids[1], H5T_DIR_DEFAULT);
+//
+//    for (i = 0; i < nelmts[0]; i++) {
+//        href_t ref;
+//        char attr_name[H5X_DUMMY_MAX_NAME_LEN];
+//        char filename[H5X_DUMMY_MAX_NAME_LEN];
+//        char pathname[H5X_DUMMY_MAX_NAME_LEN];
+//
+//        H5R__get_attr_name(NULL, attr_refs[i], attr_name, H5X_DUMMY_MAX_NAME_LEN);
+//        H5R__get_obj_name(NULL, attr_refs[i], pathname, H5X_DUMMY_MAX_NAME_LEN);
+//        H5Rget_file_name(attr_refs[i], attr_name, H5X_DUMMY_MAX_NAME_LEN);
+//        ref = H5R_create_ext_attr(filename, pathname, attr_name);
+//        if (FAIL == H5X__dummy_metadata_add(metadata, attr_refs[i], H5Q_TYPE_ATTR_NAME, attr_name))
+//            HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
+//    }
+
+//done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* H5X__dummy_index_rebuild */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5X_dummy_create
+ *
+ * Purpose: This function creates a new instance of a dummy plugin index.
+ *
+ * Return:  Success:    Pointer to the new index
+ *          Failure:    NULL
+ *
+ *------------------------------------------------------------------------
+ */
+static void *
+H5X__dummy_create(hid_t loc_id, hid_t H5_ATTR_UNUSED xcpl_id, hid_t xapl_id,
+    size_t *metadata_size, void **metadata)
+{
+    H5X_dummy_t *dummy = NULL;
+    hid_t file_id, trans_id = FAIL, rcxt_id = FAIL;
+    uint64_t version;
+    void *ret_value = NULL; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_create");
+
+    /* Create new dummy instance */
+    if (NULL == (dummy = (H5X_dummy_t *) H5MM_malloc(sizeof(H5X_dummy_t))))
+        HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, NULL, "can't allocate dummy struct");
+    H5Q_QUEUE_INIT(&dummy->metadata.attr_names);
+    H5Q_QUEUE_INIT(&dummy->metadata.attr_values);
+    H5Q_QUEUE_INIT(&dummy->metadata.link_names);
+
+    /* Get file ID */
+    if (FAIL == (file_id = H5Iget_file_id(loc_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get file ID");
+
+    /* Get transaction ID from xapl */
+    if (FAIL == H5Pget_xapl_transaction(xapl_id, &trans_id))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get trans_id from xapl");
+
+    /* Create read context from version */
+    if (FAIL == H5TRget_version(trans_id, &version))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get version from transaction ID");
+    if (FAIL == (rcxt_id =  H5RCcreate(file_id, version)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTCREATE, NULL, "can't create read context");
+
+    /* Visit file */
+    if (FAIL == H5Ovisit_ff(loc_id, H5_INDEX_NAME, H5_ITER_NATIVE, H5X__dummy_index,
+        &dummy->metadata, rcxt_id, H5_EVENT_STACK_NULL))
+        HGOTO_ERROR(H5E_SYM, H5E_BADITER, NULL, "object visitation failed");
+
+    /* Write index metadata */
+    if (FAIL == H5X__dummy_metadata_write(&dummy->metadata, file_id, trans_id,
+        metadata_size, metadata))
+        HGOTO_ERROR(H5E_INDEX, H5E_WRITEERROR, NULL, "can't write metadata");
+
+    ret_value = dummy;
+
+done:
+    if (FAIL != rcxt_id)
+        H5RCclose(rcxt_id);
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X_dummy_create() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5X_dummy_remove
+ *
+ * Purpose: This function removes the dummy plugin index from the file.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5X__dummy_remove(hid_t H5_ATTR_UNUSED file_id, size_t H5_ATTR_UNUSED metadata_size,
+        void H5_ATTR_UNUSED *metadata)
+{
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT_NOERR
+
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_remove");
+
+    /* TODO Does not do anything */
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X_dummy_remove() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5X_dummy_open
+ *
+ * Purpose: This function opens an already existing dummy index from a file.
+ *
+ * Return:  Success:    Pointer to the index
+ *          Failure:    NULL
+ *
+ *-------------------------------------------------------------------------
+ */
+static void *
+H5X__dummy_open(hid_t loc_id, hid_t xapl_id, size_t metadata_size,
+    void *metadata)
+{
+    hid_t file_id;
+    H5X_dummy_t *dummy = NULL;
+    hid_t rcxt_id;
+    void *ret_value = NULL; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_open");
+
+    if (!metadata_size)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, NULL, "NULL metadata size");
+    if (!metadata)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, NULL, "NULL metadata");
+    if (FAIL == H5Pget_xapl_read_context(xapl_id, &rcxt_id))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get rc_id from xapl");
+
+    if (NULL == (dummy = (H5X_dummy_t *) H5MM_malloc(sizeof(H5X_dummy_t))))
+        HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, NULL, "can't allocate dummy struct");
+
+    if (FAIL == (file_id = H5Iget_file_id(loc_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get file ID");
+
+    if (FAIL == H5X__dummy_metadata_read(file_id, metadata_size, metadata,
+        &dummy->metadata, rcxt_id))
+        HGOTO_ERROR(H5E_INDEX, H5E_READERROR, NULL, "can't read metadata");
+
+    ret_value = dummy;
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X_dummy_open() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5X_dummy_close
+ *
+ * Purpose: This function closes a dummy index.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5X__dummy_close(void *idx_handle)
+{
+    H5X_dummy_t *dummy = (H5X_dummy_t *) idx_handle;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_close");
+
+    if (NULL == dummy)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL index handle");
+
+    /* Free metadata */
+    if (FAIL == H5X__dummy_metadata_free(&dummy->metadata))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTFREE, FAIL, "cannot free metadata");
+
+    H5MM_free(dummy);
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X_dummy_close() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5X_dummy_query
+ *
+ * Purpose: This function queries a dummy index.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5X__dummy_query(void *idx_handle, hid_t query_id, hid_t xxpl_id,
+    size_t *ref_count, href_t *refs[])
+{
+    H5X_dummy_t *dummy = (H5X_dummy_t *) idx_handle;
+    H5X_dummy_head_t query_result;
+    hid_t rcxt_id;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    H5X_DUMMY_LOG_DEBUG("Calling H5X_dummy_query");
+
+    if (NULL == dummy)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL index handle");
+    if (FAIL == H5Pget_xxpl_read_context(xxpl_id, &rcxt_id))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get rcxt_id from xxpl");
+
+    /* We assume here that the queries passed only operate on metadata */
+    if (FAIL == H5X__dummy_metadata_query(&dummy->metadata, query_id, &query_result))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTCOMPARE, FAIL, "can't query metadata");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X_dummy_query() */
+
+static herr_t
+H5X__dummy_metadata_query(H5X_dummy_metadata_t *metadata, hid_t query_id,
+    H5X_dummy_head_t *result)
+{
+    H5Q_type_t query_type;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    if (FAIL == H5Qget_type(query_id, &query_type))
+        HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get query type");
+
+    if (query_type != H5Q_TYPE_MISC) {
+//        if (FAIL == H5X__dummy_metadata_query_singleton(metadata, query_id, result))
+//            HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to compare query");
+    } else {
+        H5Q_combine_op_t op_type;
+        hid_t sub_query1_id, sub_query2_id;
+        H5X_dummy_head_t result1, result2;
+
+        if (FAIL == H5Qget_combine_op(query_id, &op_type))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get combine op");
+        if (FAIL == H5Qget_components(query_id, &sub_query1_id, &sub_query2_id))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get components");
+
+        if (FAIL == H5X__dummy_metadata_query(metadata, query_id, &result1))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
+        if (FAIL == H5X__dummy_metadata_query(metadata, query_id, &result2))
+            HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
+
+//        if (FAIL == H5Q__view_combine(op_type, &view1, &view2, result1, result2,
+//                args->view, args->result))
+//            HGOTO_ERROR(H5E_QUERY, H5E_CANTMERGE, FAIL, "unable to merge results");
+//
+//        if (result1) H5Q__view_free(&view1);
+//        if (result2) H5Q__view_free(&view2);
+    }
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+}
+
+static herr_t
+H5X__dummy_query_combine_result(H5Q_combine_op_t combine_op,
+    H5X_dummy_head_t *result1, H5X_dummy_head_t *result2)
+{
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    if ((combine_op == H5Q_COMBINE_AND) && ((result1 && result2))) {
+//        unsigned combine_result = (result1 > result2) ? result1 : result2;
+//
+//        H5Q_LOG_DEBUG("Result 1 (%x), result 2 (%x), combined result (%x)\n",
+//                result1, result2, combine_result);
+//
+//        *result = combine_result;
+//
+//        switch (combine_result) {
+//            case H5Q_REF_REG:
+//                /* Combined results are on the same object (here, dataset),
+//                 * therefore at this point only result1 or result2 has a region
+//                 * reference */
+//                if (result1 & H5Q_REF_REG)
+//                    H5Q_QUEUE_CONCAT(&view->reg_refs, &view1->reg_refs);
+//                else if (result2 & H5Q_REF_REG)
+//                    H5Q_QUEUE_CONCAT(&view->reg_refs, &view2->reg_refs);
+//                break;
+//            case H5Q_REF_OBJ:
+//                if (result1 & H5Q_REF_OBJ)
+//                    H5Q_QUEUE_CONCAT(&view->obj_refs, &view1->obj_refs);
+//                else if (result2 & H5Q_REF_OBJ)
+//                    H5Q_QUEUE_CONCAT(&view->obj_refs, &view2->obj_refs);
+//                break;
+//            case H5Q_REF_ATTR:
+//                /* TODO check that references are equal and keep refs equal, discard others*/
+//                if (result1 & H5Q_REF_ATTR)
+//                    H5Q_QUEUE_CONCAT(&view->attr_refs, &view1->attr_refs);
+//                else if (result2 & H5Q_REF_ATTR)
+//                    H5Q_QUEUE_CONCAT(&view->attr_refs, &view2->attr_refs);
+//                break;
+//            default:
+//                HGOTO_ERROR(H5E_QUERY, H5E_BADTYPE, FAIL, "unsupported/unrecognized query type");
+//                break;
+//        }
+    } else if ((combine_op == H5Q_COMBINE_OR) && ((result1 || result2))) {
+//        H5Q_ref_head_t *refs[H5Q_VIEW_REF_NTYPES] = { &view->reg_refs, &view->obj_refs, &view->attr_refs };
+//        H5Q_ref_head_t *refs1[H5Q_VIEW_REF_NTYPES] = { &view1->reg_refs, &view1->obj_refs, &view1->attr_refs };
+//        H5Q_ref_head_t *refs2[H5Q_VIEW_REF_NTYPES] = { &view2->reg_refs, &view2->obj_refs, &view2->attr_refs };
+//        unsigned combine_result = result1 | result2;
+//        int i;
+//
+//        H5Q_LOG_DEBUG("Result 1 (%x), result 2 (%x), combined result (%x)\n",
+//                result1, result2, combine_result);
+//
+//        *result = combine_result;
+//
+//        /* Simply concatenate results from sub-views */
+//        for (i = 0; i < H5Q_VIEW_REF_NTYPES; i++) {
+//            H5Q_QUEUE_CONCAT(refs[i], refs1[i]);
+//            H5Q_QUEUE_CONCAT(refs[i], refs2[i]);
+//        }
+    }
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5Q__view_combine */

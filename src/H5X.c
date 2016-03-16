@@ -137,6 +137,8 @@ H5X__init_package(void)
 #ifdef H5_HAVE_EFF
     if (H5X_register(H5X_DUMMY_FF) < 0)
         HGOTO_ERROR (H5E_PLINE, H5E_CANTINIT, FAIL, "unable to register dummy index plugin");
+    if (H5X_register(H5X_META_DUMMY_FF) < 0)
+        HGOTO_ERROR (H5E_PLINE, H5E_CANTINIT, FAIL, "unable to register meta dummy index plugin");
 #endif
 
 done:

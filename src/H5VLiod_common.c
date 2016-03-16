@@ -934,7 +934,7 @@ H5VL_iod_cs_recv_helper(char *buf, H5VL_iod_type_info_t *type_info,
                     } /* end if */
                 } /* end if */
                 else if(H5T_REFERENCE == type_info->type_class) {
-                    href_t ref = *(href_t *)(buf + (i * type_info->size) + type_info->vls[j].offset);
+                    href_t ref = (href_t)(buf + (i * type_info->size) + type_info->vls[j].offset);
                     uint64_t vl_length;
 
                     /* Retrieve buf size */
@@ -1388,16 +1388,12 @@ EFF__mercury_register_callbacks(void)
     H5VL_VIEW_CREATE_ID = MERCURY_REGISTER("view_create", view_create_in_t, view_create_out_t,
                                            H5VL_iod_server_view_create);
 
-    H5VL_DSET_SET_INDEX_INFO_ID = MERCURY_REGISTER("dset_set_index_info",
-                                                   dset_set_index_info_in_t, ret_t,
-                                                   H5VL_iod_server_dset_set_index_info);
-    H5VL_DSET_GET_INDEX_INFO_ID = MERCURY_REGISTER("dset_get_index_info",
-                                                   dset_get_index_info_in_t, 
-                                                   dset_get_index_info_out_t,
-                                                   H5VL_iod_server_dset_get_index_info);
-    H5VL_DSET_RM_INDEX_INFO_ID = MERCURY_REGISTER("dset_rm_index_info",
-                                                  dset_rm_index_info_in_t, ret_t,
-                                                  H5VL_iod_server_dset_remove_index_info);
+    H5VL_IDX_SET_INFO_ID = MERCURY_REGISTER("dset_set_index_info",
+        idx_set_info_in_t, ret_t, H5VL_iod_server_index_set_info);
+    H5VL_IDX_GET_INFO_ID = MERCURY_REGISTER("dset_get_index_info",
+        idx_get_info_in_t, idx_get_info_out_t, H5VL_iod_server_index_get_info);
+    H5VL_IDX_RM_INFO_ID = MERCURY_REGISTER("dset_rm_index_info",
+        idx_rm_info_in_t, ret_t, H5VL_iod_server_index_remove_info);
 
     H5VL_CANCEL_OP_ID = MERCURY_REGISTER("cancel_op", uint64_t, uint8_t,
                                          H5VL_iod_server_cancel_op);

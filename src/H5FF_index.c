@@ -48,6 +48,11 @@
 /* Local Prototypes */
 /********************/
 
+static herr_t H5X_create_data_ff(hid_t loc_id, H5X_class_t *idx_class,
+    hid_t xcpl_id, hid_t xapl_id, hid_t trans_id);
+static herr_t H5X_create_metadata_ff(hid_t loc_id, H5X_class_t *idx_class,
+    hid_t xcpl_id, hid_t xapl_id, hid_t trans_id);
+
 /*********************/
 /* Package Variables */
 /*********************/
@@ -74,48 +79,27 @@ H5Xcreate_ff(hid_t loc_id, unsigned plugin_id, hid_t xcpl_id, hid_t trans_id,
     hid_t estack_id)
 {
     H5X_class_t *idx_class = NULL;
-    H5_priv_request_t *request = NULL; /* private request struct inserted in event queue */
-    void **req = NULL; /* pointer to plugin generate requests (NULL if VOL plugin does not support async) */
-    void *idx_handle = NULL; /* pointer to index object created */
-    H5VL_object_t *file = NULL, *dset = NULL;
-    size_t plugin_index;
     H5P_genplist_t *plist;
-    hid_t dset_id = loc_id; /* TODO for now */
-    hid_t xapl_id = H5P_INDEX_ACCESS_DEFAULT; /* TODO for now */
-    size_t metadata_size; /* size of metadata created by plugin */
-    void *metadata; /* metadata created by plugin that needs to be stored */
+    hid_t xapl_id = H5P_INDEX_ACCESS_DEFAULT;
     herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
     /* Check args */
+    if (NULL == H5VL_get_object(loc_id))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid object/file identifier");
     if ((plugin_id < 0) || (plugin_id > H5X_PLUGIN_MAX))
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid plugin identification number");
-//    if (NULL == (file = (H5VL_object_t *) H5I_object_verify(file_id, H5I_FILE)))
-//        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "not a file ID");
-    if (NULL == H5I_object_verify(dset_id, H5I_DATASET))
-        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "scope_id is restricted to dataset ID");
-    if (NULL == (dset = H5VL_get_object(dset_id)))
-        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid object/file identifier");
-
-    /* Is the plugin already registered */
-//    if (FALSE == H5X__registered(plugin_id, &plugin_index))
-//        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin is not registered");
-
-    /* Get correct property list */
+    if (NULL == (idx_class = H5X_registered(plugin_id)))
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin is not registered");
     if (H5P_DEFAULT == xcpl_id)
         xcpl_id = H5P_INDEX_CREATE_DEFAULT;
-    else
+    else {
         if (TRUE != H5P_isa_class(xcpl_id, H5P_INDEX_CREATE))
             HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not index creation property list");
-
-    if(estack_id != H5_EVENT_STACK_NULL) {
-        /* create the private request */
-        if(NULL == (request = (H5_priv_request_t *)H5MM_calloc(sizeof(H5_priv_request_t))))
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "memory allocation failed");
-        req = &request->req;
-        request->vol_cls = dset->vol_info->vol_cls;
     }
+    if(estack_id != H5_EVENT_STACK_NULL)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "Event stack not supported for now");
 
     /* Store the transaction ID in the xapl_id */
     if (NULL == (plist = (H5P_genplist_t *)H5I_object(xapl_id)))
@@ -123,30 +107,111 @@ H5Xcreate_ff(hid_t loc_id, unsigned plugin_id, hid_t xcpl_id, hid_t trans_id,
     if (H5P_set(plist, H5VL_TRANS_ID, &trans_id) < 0)
         HGOTO_ERROR(H5E_PLIST, H5E_CANTGET, FAIL, "can't set property value for trans_id");
 
-    /* Is the plugin already registered */
-    if (NULL == (idx_class = H5X_registered(plugin_id)))
-        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin is not registered");
-    /* Call create of the plugin */
-    if (NULL == idx_class->create)
-        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin create callback is not defined");
-    if (NULL == (idx_handle = idx_class->create(dset_id, xcpl_id, xapl_id,
-            &metadata_size, &metadata)))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTCREATE, FAIL, "cannot create new plugin index");
-
-    /* Add idx_handle to dataset */
-    if (FAIL == H5VL_iod_dataset_set_index(dset, idx_handle))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTSET, FAIL, "cannot set index to dataset");
-    if (FAIL == H5VL_iod_dataset_set_index_info(dset, plugin_id,
-            metadata_size, metadata, trans_id, req))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTSET, FAIL, "cannot set index info to dataset");
-
-    if (request && *req)
-        if(H5ES_insert(estack_id, request) < 0)
-            HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, FAIL, "failed to insert request in event stack")
+    if (idx_class->type == H5X_TYPE_DATA) {
+        if (FAIL == H5X_create_data_ff(loc_id, idx_class, xcpl_id, xapl_id, trans_id))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTCREATE, FAIL, "cannot create data index");
+    }
+    else if (idx_class->type == H5X_TYPE_METADATA) {
+        if (FAIL == H5X_create_metadata_ff(loc_id, idx_class, xcpl_id, xapl_id, trans_id))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTCREATE, FAIL, "cannot create metadata index");
+    } else
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "invalid index type");
 
 done:
     FUNC_LEAVE_API(ret_value)
 } /* end H5Xcreate_ff() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5X_create_data_ff
+ *
+ * Purpose: Create a new index in a container.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5X_create_data_ff(hid_t loc_id, H5X_class_t *idx_class, hid_t xcpl_id,
+    hid_t xapl_id, hid_t trans_id)
+{
+    H5VL_object_t *dset = NULL;
+    void *idx_handle = NULL; /* Pointer to index object created */
+    size_t metadata_size; /* Size of metadata created by plugin */
+    void *metadata; /* Metadata created by plugin that needs to be stored */
+    H5O_idxinfo_t idx_info;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(idx_class);
+    HDassert(idx_class->type == H5X_TYPE_DATA);
+
+    if (NULL == (dset = H5I_object_verify(loc_id, H5I_DATASET)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "loc_id is restricted to dataset");
+
+    /* Call create of the plugin */
+    if (NULL == idx_class->idx_class.data_class.create)
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin create callback is not defined");
+    if (NULL == (idx_handle = idx_class->idx_class.data_class.create(loc_id, xcpl_id, xapl_id,
+            &metadata_size, &metadata)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTCREATE, FAIL, "cannot create new plugin index");
+
+    /* Add idx_handle to dataset */
+    idx_info.plugin_id = idx_class->id;
+    idx_info.metadata_size = metadata_size;
+    idx_info.metadata = metadata;
+    if (FAIL == H5VL_iod_index_set(dset->vol_obj, idx_class, idx_handle, &idx_info, trans_id))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTSET, FAIL, "cannot set index to dataset");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X_create_data_ff() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5X_create_metadata_ff
+ *
+ * Purpose: Create a new index in a container.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5X_create_metadata_ff(hid_t loc_id, H5X_class_t *idx_class, hid_t xcpl_id,
+    hid_t xapl_id, hid_t trans_id)
+{
+    H5VL_object_t *file = NULL;
+    void *idx_handle = NULL; /* Pointer to index object created */
+    size_t metadata_size; /* Size of metadata created by plugin */
+    void *metadata; /* Metadata created by plugin that needs to be stored */
+    H5O_idxinfo_t idx_info;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    HDassert(idx_class);
+    HDassert(idx_class->type == H5X_TYPE_METADATA);
+
+    if (NULL == (file = H5I_object_verify(loc_id, H5I_FILE)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "loc_id is restricted to dataset");
+
+    /* Call create of the plugin */
+    if (NULL == idx_class->idx_class.metadata_class.create)
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin create callback is not defined");
+    if (NULL == (idx_handle = idx_class->idx_class.metadata_class.create(loc_id, xcpl_id, xapl_id,
+            &metadata_size, &metadata)))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTCREATE, FAIL, "cannot create new plugin index");
+
+    /* Add idx_handle to dataset */
+    idx_info.plugin_id = idx_class->id;
+    idx_info.metadata_size = metadata_size;
+    idx_info.metadata = metadata;
+    if (FAIL == H5VL_iod_index_set(file->vol_obj, idx_class, idx_handle, &idx_info, trans_id))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTSET, FAIL, "cannot set index to file");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X_create_metadata_ff() */
 
 /*-------------------------------------------------------------------------
  * Function:    H5Xremove_ff
@@ -160,15 +225,15 @@ done:
 herr_t
 H5Xremove_ff(hid_t loc_id, unsigned idx, hid_t trans_id, hid_t estack_id)
 {
-    H5_priv_request_t *request = NULL; /* private request struct inserted in event queue */
-    void **req = NULL; /* pointer to plugin generate requests (NULL if VOL plugin does not support async) */
-    H5VL_object_t *file = NULL, *dset = NULL;
-    size_t plugin_index;
-    H5P_genplist_t *plist;
-    hid_t dataset_id = loc_id; /* TODO for now */
-    hid_t xapl_id = H5P_INDEX_ACCESS_DEFAULT; /* TODO for now */
-    size_t metadata_size; /* size of metadata created by plugin */
-    void *metadata; /* metadata created by plugin that needs to be stored */
+//    H5_priv_request_t *request = NULL; /* private request struct inserted in event queue */
+//    void **req = NULL; /* pointer to plugin generate requests (NULL if VOL plugin does not support async) */
+//    H5VL_object_t *file = NULL, *dset = NULL;
+//    size_t plugin_index;
+//    H5P_genplist_t *plist;
+//    hid_t dataset_id = loc_id; /* TODO for now */
+//    hid_t xapl_id = H5P_INDEX_ACCESS_DEFAULT; /* TODO for now */
+//    size_t metadata_size; /* size of metadata created by plugin */
+//    void *metadata; /* metadata created by plugin that needs to be stored */
     herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
@@ -235,9 +300,9 @@ herr_t
 H5Xget_count_ff(hid_t loc_id, hsize_t *idx_count, hid_t rcxt_id,
     hid_t estack_id)
 {
-    H5_priv_request_t *request = NULL; /* private request struct inserted in event queue */
-    void **req = NULL; /* pointer to plugin generate requests (NULL if VOL plugin does not support async) */
-    H5VL_object_t *dset;
+//    H5_priv_request_t *request = NULL; /* private request struct inserted in event queue */
+//    void **req = NULL; /* pointer to plugin generate requests (NULL if VOL plugin does not support async) */
+//    H5VL_object_t *dset;
     herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)

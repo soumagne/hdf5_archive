@@ -129,9 +129,9 @@ hg_id_t H5VL_PREFETCH_ID;
 hg_id_t H5VL_EVICT_ID;
 hg_id_t H5VL_CANCEL_OP_ID;
 hg_id_t H5VL_VIEW_CREATE_ID;
-hg_id_t H5VL_DSET_SET_INDEX_INFO_ID;
-hg_id_t H5VL_DSET_GET_INDEX_INFO_ID;
-hg_id_t H5VL_DSET_RM_INDEX_INFO_ID;
+hg_id_t H5VL_IDX_SET_INFO_ID;
+hg_id_t H5VL_IDX_GET_INFO_ID;
+hg_id_t H5VL_IDX_RM_INFO_ID;
 
 /* Prototypes */
 static void *H5VL_iod_fapl_copy(const void *_old_fa);
@@ -1276,6 +1276,7 @@ H5VL_iod_file_open(const char *name, unsigned flags, hid_t fapl_id,
     file_open_in_t input;
     hid_t rcxt_id;
     uint32_t cs_scope;
+    unsigned idx_count;
     void  *ret_value = NULL;
 
     FUNC_ENTER_NOAPI_NOINIT
@@ -1360,6 +1361,18 @@ H5VL_iod_file_open(const char *name, unsigned flags, hid_t fapl_id,
                                     (H5VL_iod_object_t *)file, 1, 0, NULL,
                                     NULL, &input, &file->remote_file, file, req) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, NULL, "failed to create and ship file open");
+
+    /* Get index info if present */
+    /* TODO move that */
+    if (FAIL == H5VL_iod_index_get_info(file, &file->idx_info, &idx_count, rcxt_id, NULL))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get index info for dataset");
+    if (idx_count) {
+        H5X_class_t *idx_class = NULL;
+
+        if (NULL == (idx_class = H5X_registered(file->idx_info.plugin_id)))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get index plugin class");
+        file->idx_class = idx_class;
+    } /* end if */
 
     ret_value = (void *)file;
 
@@ -1634,6 +1647,10 @@ H5VL_iod_file_close(void *_file, hid_t H5_ATTR_UNUSED dxpl_id, void **req)
                                     num_parents, parent_reqs,
                                     NULL, &input, status, status, req) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, FAIL, "failed to create and ship file close");
+
+    /* Close index object*/
+    if (file->idx_handle && (FAIL == H5VL_iod_index_close(file)))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTCLOSEOBJ, FAIL, "cannot close index")
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -2190,8 +2207,13 @@ H5VL_iod_dataset_create(void *_obj, H5VL_loc_params_t H5_ATTR_UNUSED loc_params,
     dset->remote_dset.iod_oh.rd_oh.cookie = IOD_OH_UNDEFINED;
     dset->remote_dset.iod_oh.wr_oh.cookie = IOD_OH_UNDEFINED;
     dset->remote_dset.iod_id = IOD_OBJ_INVALID;
-    dset->idx_plugin_id = 0;
+
+    /* Index info */
     dset->idx_handle = NULL;
+    dset->idx_class = NULL;
+    dset->idx_info.plugin_id = 0;
+    dset->idx_info.metadata = NULL;
+    dset->idx_info.metadata_size = 0;
 
     /* Copy virtual storage if the dataset is virtual */
     if(layout.type == H5D_VIRTUAL) {
@@ -2339,6 +2361,7 @@ H5VL_iod_dataset_open(void *_obj, H5VL_loc_params_t H5_ATTR_UNUSED loc_params, c
     H5RC_t *rc = NULL;
     size_t num_parents = 0;
     H5VL_iod_request_t **parent_reqs = NULL;
+    unsigned idx_count;
     void *ret_value = NULL;
 
     FUNC_ENTER_NOAPI_NOINIT
@@ -2390,8 +2413,13 @@ H5VL_iod_dataset_open(void *_obj, H5VL_loc_params_t H5_ATTR_UNUSED loc_params, c
     dset->remote_dset.dcpl_id = -1;
     dset->remote_dset.type_id = -1;
     dset->remote_dset.space_id = -1;
-    dset->idx_plugin_id = 0;
+
+    /* Index info */
     dset->idx_handle = NULL;
+    dset->idx_class = NULL;
+    dset->idx_info.plugin_id = 0;
+    dset->idx_info.metadata = NULL;
+    dset->idx_info.metadata_size = 0;
 
     /* set the input structure for the HG encode routine */
     input.coh = obj->file->remote_file.coh;
@@ -2433,6 +2461,18 @@ H5VL_iod_dataset_open(void *_obj, H5VL_loc_params_t H5_ATTR_UNUSED loc_params, c
                                     num_parents, parent_reqs,
                                     (H5VL_iod_req_info_t *)rc, &input, &dset->remote_dset, dset, req) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, NULL, "failed to create and ship dataset open");
+
+    /* Get index info if present */
+    /* TODO move that */
+    if (FAIL == H5VL_iod_index_get_info(dset, &dset->idx_info, &idx_count, rcxt_id, NULL))
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get index info for dataset");
+    if (idx_count) {
+        H5X_class_t *idx_class = NULL;
+
+        if (NULL == (idx_class = H5X_registered(dset->idx_info.plugin_id)))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get index plugin class");
+        dset->idx_class = idx_class;
+    } /* end if */
 
     ret_value = (void *)dset;
 
@@ -3105,15 +3145,6 @@ H5VL_iod_dataset_write(void *_dset, hid_t mem_type_id, hid_t mem_space_id,
 
         /* Fill in rest of info structure */
         vds_info->status = status;
-//#ifdef H5_HAVE_INDEXING
-//        /* setup extra info required for the index post_update operation */
-//        vds_info->dset = dset;
-//        vds_info->idx_handle = dset->idx_handle;
-//        vds_info->idx_plugin_id = dset->idx_plugin_id;
-//        vds_info->buf = buf;
-//        vds_info->dataspace_id = file_space_id;
-//        vds_info->trans_id = trans_id;
-//#endif
 
         if(H5VL__iod_create_and_forward(H5VL_DSET_MULTI_WRITE_ID, HG_DSET_MULTI_WRITE, 
                                         (H5VL_iod_object_t *)dset, 0, num_parents, parent_reqs,
@@ -3198,16 +3229,33 @@ H5VL_iod_dataset_write(void *_dset, hid_t mem_type_id, hid_t mem_space_id,
         info->bulk_handle = bulk_handle;
         info->vl_len_bulk_handle = vl_len_bulk_handle;
         info->vl_lengths = vl_lengths;
-//#ifdef H5_HAVE_INDEXING
-//        /* setup extra info required for the index post_update operation */
-//        info->dset = dset;
-//        info->idx_handle = dset->idx_handle;
-//        info->idx_plugin_id = dset->idx_plugin_id;
-//        info->buf = buf;
-//        info->dataspace_id = file_space_id;
-//        info->trans_id = trans_id;
-//#endif
+        /* setup extra info required for the index post_update operation */
+        info->dset = dset;
+        info->idx_handle = dset->idx_handle;
+        info->idx_class = dset->idx_class;
+        info->buf = buf;
+        info->dataspace_id = file_space_id;
+        info->trans_id = trans_id;
 
+        /* Call index pre_update if available */
+        if (dset->idx_class) {
+            H5X_class_t *idx_class = dset->idx_class;
+            void *idx_handle = dset->idx_handle;
+            H5P_genplist_t *xxpl_plist; /* Property list pointer */
+            hid_t xxpl_id = H5P_INDEX_XFER_DEFAULT;
+
+            /* Store the transaction ID in the xxpl */
+            if(NULL == (xxpl_plist = (H5P_genplist_t *)H5I_object(xxpl_id)))
+                HGOTO_ERROR(H5E_ATOM, H5E_BADATOM, FAIL, "can't find object for ID")
+            if(H5P_set(xxpl_plist, H5VL_TRANS_ID, &trans_id) < 0)
+                HGOTO_ERROR(H5E_PLIST, H5E_CANTGET, FAIL, "can't set property value for trans_id")
+
+            if (idx_class->idx_class.data_class.pre_update &&
+                    (FAIL == idx_class->idx_class.data_class.pre_update(idx_handle, file_space_id, xxpl_id)))
+                HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "cannot do an index pre-update");
+        }
+
+        /* Forward call */
         if(H5VL__iod_create_and_forward(H5VL_DSET_WRITE_ID, HG_DSET_WRITE, 
                                         (H5VL_iod_object_t *)dset, 0, num_parents, parent_reqs,
                                         (H5VL_iod_req_info_t *)tr, &input, status, info, req) < 0)
@@ -3503,6 +3551,10 @@ H5VL_iod_dataset_close(void *_dset, hid_t dxpl_id, void **req)
                                     num_parents, parent_reqs,
                                     NULL, &input, status, status, req) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, FAIL, "failed to create and ship dataset close");
+
+    /* Close index object*/
+    if (dset->idx_handle && (FAIL == H5VL_iod_index_close(dset)))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTCLOSEOBJ, FAIL, "cannot close index")
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -10441,27 +10493,48 @@ done:
 /*-------------------------------------------------------------------------
  * Function:    H5VL_iod_dataset_set_index
  *
- * Purpose: Set a new index to a dataset.
+ * Purpose: Set index information.
  *
  * Return:  Success:    SUCCEED
  *          Failure:    FAIL
  *-------------------------------------------------------------------------
  */
 herr_t
-H5VL_iod_dataset_set_index(void *dset, void *idx_handle)
+H5VL_iod_index_set(void *_obj, H5X_class_t *idx_class, void *idx_handle,
+    H5O_idxinfo_t *idx_info, hid_t trans_id)
 {
-    H5VL_iod_dset_t *iod_dset = (H5VL_iod_dset_t *) dset;
+    H5VL_iod_object_t *obj = (H5VL_iod_object_t *)_obj;
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    HDassert(dset);
+    HDassert(obj);
+    HDassert(idx_class);
+    HDassert(idx_handle);
+    HDassert(idx_info);
 
-#if H5_EFF_DEBUG
-    printf("Index handle set to dataset\n");
-#endif
+    /* Set index info */
+    switch (obj->obj_type) {
+        case H5I_DATASET:
+            ((H5VL_iod_dset_t *)obj)->idx_class = idx_class;
+            ((H5VL_iod_dset_t *)obj)->idx_handle = idx_handle;
+            if (NULL == H5O_msg_copy(H5O_IDXINFO_ID, idx_info, &((H5VL_iod_dset_t *)obj)->idx_info))
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTCOPY, FAIL, "unable to update copy message");
+            break;
+        case H5I_FILE:
+            ((H5VL_iod_file_t *)obj)->idx_class = idx_class;
+            ((H5VL_iod_file_t *)obj)->idx_handle = idx_handle;
+            if (NULL == H5O_msg_copy(H5O_IDXINFO_ID, idx_info, &((H5VL_iod_file_t *)obj)->idx_info))
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTCOPY, FAIL, "unable to update copy message");
+            break;
+        default:
+            HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "unsupported object type");
+            break;
+    }
 
-    iod_dset->idx_handle = idx_handle;
+    /* Write the index header message */
+    if (H5VL_iod_index_set_info(obj, idx_info, trans_id, NULL))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTINIT, FAIL, "unable to update index header message");
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -10476,75 +10549,161 @@ done:
  *          Failure:    NULL
  *-------------------------------------------------------------------------
  */
-void *
-H5VL_iod_dataset_get_index(void *dset)
+herr_t
+H5VL_iod_index_get(void *_obj, H5X_class_t **idx_class, void **idx_handle,
+    H5O_idxinfo_t **idx_info, unsigned *actual_count)
 {
-    H5VL_iod_dset_t *iod_dset = (H5VL_iod_dset_t *) dset;
-    void *ret_value = NULL;
+    H5VL_iod_object_t *obj = (H5VL_iod_object_t *)_obj;
+    herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    HDassert(dset);
+    HDassert(obj);
 
-    ret_value = iod_dset->idx_handle;
+    /* Get index info */
+    switch (obj->obj_type) {
+        case H5I_DATASET:
+            if (idx_class) *idx_class = ((H5VL_iod_dset_t *)obj)->idx_class;
+            if (idx_handle) *idx_handle = ((H5VL_iod_dset_t *)obj)->idx_handle;
+            if (idx_info) *idx_info = &((H5VL_iod_dset_t *)obj)->idx_info;
+            if (actual_count) *actual_count = (((H5VL_iod_dset_t *)obj)->idx_class) ? 1 : 0;
+            break;
+        case H5I_FILE:
+            if (idx_class) *idx_class = ((H5VL_iod_file_t *)obj)->idx_class;
+            if (idx_handle) *idx_handle = ((H5VL_iod_file_t *)obj)->idx_handle;
+            if (idx_info) *idx_info = &((H5VL_iod_file_t *)obj)->idx_info;
+            if (actual_count) *actual_count = (((H5VL_iod_file_t *)obj)->idx_class) ? 1 : 0;
+            break;
+        default:
+            HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "unsupported object type");
+            break;
+    }
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5VL_iod_dataset_get_index() */
 
 /*-------------------------------------------------------------------------
- * Function:    H5VL_iod_dataset_set_index_plugin_id
+ * Function:    H5VL_iod_index_open
  *
- * Purpose: Set a new index plugin ID to a dataset.
+ * Purpose: Open index.
  *
- * Return:  Success:    SUCCEED
- *          Failure:    FAIL
+ * Return:  Success:    Non-negative
+ *      Failure:    Negative
+ *
  *-------------------------------------------------------------------------
  */
 herr_t
-H5VL_iod_dataset_set_index_plugin_id(void *dset, unsigned plugin_id)
+H5VL_iod_index_open(hid_t obj_id, void *_obj, hid_t xapl_id)
 {
-    H5VL_iod_dset_t *iod_dset = (H5VL_iod_dset_t *) dset;
-    herr_t ret_value = SUCCEED;
+    H5VL_iod_object_t *obj = (H5VL_iod_object_t *)_obj;
+    H5X_class_t *idx_class;
+    void *idx_handle = NULL;
+    size_t metadata_size;
+    void *metadata;
+    herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    HDassert(dset);
+    HDassert(obj);
 
-    iod_dset->idx_plugin_id = plugin_id;
+    switch (obj->obj_type) {
+        case H5I_DATASET:
+            idx_class = ((H5VL_iod_dset_t *)obj)->idx_class;
+            metadata_size = ((H5VL_iod_dset_t *)obj)->idx_info.metadata_size;
+            metadata = ((H5VL_iod_dset_t *)obj)->idx_info.metadata;
+            break;
+        case H5I_FILE:
+            idx_class = ((H5VL_iod_file_t *)obj)->idx_class;
+            metadata_size = ((H5VL_iod_file_t *)obj)->idx_info.metadata_size;
+            metadata = ((H5VL_iod_file_t *)obj)->idx_info.metadata;
+            break;
+        default:
+            HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "unsupported object type");
+            break;
+    }
+
+    if (NULL == metadata)
+        HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "no index metadata was found");
+
+    /* Open index */
+    if (idx_class->type == H5X_TYPE_DATA) {
+        if (NULL == idx_class->idx_class.data_class.open)
+            HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin open callback not defined");
+        if (NULL == (idx_handle = idx_class->idx_class.data_class.open(obj_id, xapl_id, metadata_size, metadata)))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTOPENOBJ, FAIL, "cannot open index");
+    } else if (idx_class->type == H5X_TYPE_METADATA) {
+        if (NULL == idx_class->idx_class.metadata_class.open)
+            HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin open callback not defined");
+        if (NULL == (idx_handle = idx_class->idx_class.metadata_class.open(obj_id, xapl_id, metadata_size, metadata)))
+            HGOTO_ERROR(H5E_INDEX, H5E_CANTOPENOBJ, FAIL, "cannot open index");
+    } else
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "unsupported index type");
+
+    switch (obj->obj_type) {
+        case H5I_DATASET:
+            ((H5VL_iod_dset_t *)obj)->idx_handle = idx_handle;
+            break;
+        case H5I_FILE:
+            ((H5VL_iod_file_t *)obj)->idx_handle = idx_handle;
+            break;
+        default:
+            HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "unsupported object type");
+            break;
+    }
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5VL_iod_dataset_set_index_plugin_id() */
-
+} /* end H5VL_iod_index_open() */
 
 /*-------------------------------------------------------------------------
- * Function:    H5VL_iod_dataset_get_index_plugin_id
+ * Function:    H5VL_iod_index_close
  *
- * Purpose: Get the index plugin id associated to a dataset.
+ * Purpose: Close index.
  *
- * Return:  Success:    Index handle
- *          Failure:    NULL
+ * Return:  Success:    Non-negative
+ *      Failure:    Negative
+ *
  *-------------------------------------------------------------------------
  */
-unsigned
-H5VL_iod_dataset_get_index_plugin_id(void *dset)
+herr_t
+H5VL_iod_index_close(void *_obj)
 {
-    H5VL_iod_dset_t *iod_dset = (H5VL_iod_dset_t *) dset;
-    unsigned ret_value;
+    H5VL_iod_object_t *obj = (H5VL_iod_object_t *)_obj;
+    H5X_class_t *idx_class;
+    herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    HDassert(dset);
+    HDassert(obj);
 
-    ret_value = iod_dset->idx_plugin_id;
+    /* Close index */
+    switch (obj->obj_type) {
+        case H5I_DATASET:
+            idx_class = ((H5VL_iod_dset_t *)obj)->idx_class;
+            if (NULL == (idx_class->idx_class.data_class.close))
+                HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin close callback not defined");
+            if (FAIL == idx_class->idx_class.data_class.close(((H5VL_iod_dset_t *)obj)->idx_handle))
+                HGOTO_ERROR(H5E_INDEX, H5E_CANTCLOSEOBJ, FAIL, "cannot close index");
+            break;
+        case H5I_FILE:
+            idx_class = ((H5VL_iod_file_t *)obj)->idx_class;
+            if (NULL == (idx_class->idx_class.data_class.close))
+                HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin close callback not defined");
+            if (FAIL == idx_class->idx_class.data_class.close(((H5VL_iod_file_t *)obj)->idx_handle))
+                HGOTO_ERROR(H5E_INDEX, H5E_CANTCLOSEOBJ, FAIL, "cannot close index");
+            break;
+        default:
+            HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "unsupported object type");
+            break;
+    }
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5VL_iod_dataset_get_index() */
+} /* end H5VL_iod_index_close() */
 
 /*-------------------------------------------------------------------------
- * Function:    H5VL_iod_dataset_set_index_info
+ * Function:    H5VL_iod_index_set_info
  *
  * Purpose: Set a new index to a dataset.
  *
@@ -10553,70 +10712,78 @@ done:
  *-------------------------------------------------------------------------
  */
 herr_t
-H5VL_iod_dataset_set_index_info(void *_dset, unsigned plugin_id,
-        size_t metadata_size, void *metadata, hid_t trans_id, void **req)
+H5VL_iod_index_set_info(void *_obj, H5O_idxinfo_t *idx_info, hid_t trans_id,
+    void **req)
 {
     H5VL_iod_request_t **parent_reqs = NULL;
-    H5VL_iod_dset_t *dset = (H5VL_iod_dset_t *) _dset;
-    dset_set_index_info_in_t input;
+    idx_set_info_in_t input;
     H5TR_t *tr = NULL;
     size_t num_parents = 0;
     int *status = NULL;
+    H5VL_iod_object_t *obj = (H5VL_iod_object_t *)_obj;
+    iod_obj_id_t mdkv_id;
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    HDassert(dset);
+    HDassert(obj);
+    HDassert(idx_info);
 
-    if(IOD_OBJ_INVALID == dset->remote_dset.mdkv_id) {
+    switch (obj->obj_type) {
+        case H5I_DATASET:
+            mdkv_id = ((H5VL_iod_dset_t *)obj)->remote_dset.mdkv_id;
+            break;
+        case H5I_FILE:
+            mdkv_id = ((H5VL_iod_file_t *)obj)->remote_file.mdkv_id;
+            break;
+        default:
+            HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "unsupported object type");
+            break;
+    }
+    if(IOD_OBJ_INVALID == mdkv_id) {
         /* Synchronously wait on the request attached to the dataset */
-        if(H5VL_iod_request_wait(dset->common.file, dset->common.request) < 0)
+        if(H5VL_iod_request_wait(obj->file, obj->request) < 0)
             HGOTO_ERROR(H5E_DATASET,  H5E_CANTGET, FAIL, "can't wait on HG request");
-        dset->common.request = NULL;
+        obj->request = NULL;
     }
 
-    /* set local index info */
-    dset->idx_plugin_id = plugin_id;
-
-    /* get the TR object */
+    /* Get the TR object */
     if(NULL == (tr = (H5TR_t *)H5I_object_verify(trans_id, H5I_TR)))
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "not a Transaction ID");
 
-    if(NULL == (parent_reqs = (H5VL_iod_request_t **)
-            H5MM_malloc(sizeof(H5VL_iod_request_t *) * 2)))
+    /* Retrieve parent requests */
+    if(NULL == (parent_reqs = (H5VL_iod_request_t **)H5MM_malloc(sizeof(H5VL_iod_request_t *) * 2)))
         HGOTO_ERROR(H5E_SYM, H5E_NOSPACE, FAIL, "can't allocate parent req element");
-
-    /* retrieve parent requests */
-    if(H5VL_iod_get_parent_requests((H5VL_iod_object_t *)dset, (H5VL_iod_req_info_t *)tr,
-                                    parent_reqs, &num_parents) < 0)
+    if(H5VL_iod_get_parent_requests(obj, (H5VL_iod_req_info_t *)tr, parent_reqs,
+        &num_parents) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, FAIL, "Failed to retrieve parent requests");
 
-    status = (int *)malloc(sizeof(int));
+    status = (int *)H5MM_malloc(sizeof(int));
 
     /* Fill input structure */
-    input.coh = dset->common.file->remote_file.coh;
-    input.mdkv_id = dset->remote_dset.mdkv_id;
+    input.coh = obj->file->remote_file.coh;
+    input.mdkv_id = mdkv_id;
     input.trans_num = tr->trans_num;
-    input.cs_scope = dset->common.file->md_integrity_scope;
-    input.idx_plugin_id = (uint32_t)plugin_id;
-    input.idx_metadata.buf = metadata;
-    input.idx_metadata.buf_size = metadata_size;
+    input.cs_scope = obj->file->md_integrity_scope;
+    input.idx_plugin_id = (uint32_t)idx_info->plugin_id;
+    input.idx_metadata.buf = idx_info->metadata;
+    input.idx_metadata.buf_size = idx_info->metadata_size;
 
 #if H5_EFF_DEBUG
     printf("Set index info, axe id %"PRIu64"\n", g_axe_id);
 #endif
 
-    if(H5VL__iod_create_and_forward(H5VL_DSET_SET_INDEX_INFO_ID, HG_DSET_SET_INDEX_INFO,
-                                    (H5VL_iod_object_t *)dset, 1, num_parents, parent_reqs,
-                                    (H5VL_iod_req_info_t *)tr, &input, status, status, req) < 0)
+    if(H5VL__iod_create_and_forward(H5VL_IDX_SET_INFO_ID, HG_IDX_SET_INFO,
+        obj, 1, num_parents, parent_reqs, (H5VL_iod_req_info_t *)tr, &input,
+        status, status, req) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, FAIL, "failed to create and ship set index info");
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5VL_iod_dataset_set_index_info() */
+} /* end H5VL_iod_index_set_info() */
 
 /*-------------------------------------------------------------------------
- * Function:    H5VL_iod_dataset_get_index_info
+ * Function:    H5VL_iod_index_get_info
  *
  * Purpose: Get index info from a dataset.
  *
@@ -10625,80 +10792,86 @@ done:
  *-------------------------------------------------------------------------
  */
 herr_t
-H5VL_iod_dataset_get_index_info(void *_dset, size_t *count,
-        unsigned *plugin_id, size_t *metadata_size,
-        void **metadata, hid_t rcxt_id, void **req)
+H5VL_iod_index_get_info(void *_obj, H5O_idxinfo_t *idx_info, unsigned *count,
+    hid_t rcxt_id, void **req)
 {
     H5VL_iod_request_t **parent_reqs = NULL;
-    H5VL_iod_dset_t *dset = (H5VL_iod_dset_t *) _dset;
-    H5VL_iod_dataset_get_index_info_t *info;
-    dset_get_index_info_in_t input;
-    dset_get_index_info_out_t *output;
+    H5VL_iod_index_get_info_t *info;
+    idx_get_info_in_t input;
+    idx_get_info_out_t *output;
     H5RC_t *rc = NULL;
     size_t num_parents = 0;
     int *status = NULL;
+    H5VL_iod_object_t *obj = (H5VL_iod_object_t *)_obj;
+    iod_obj_id_t mdkv_id;
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    HDassert(dset);
+    HDassert(obj);
+    HDassert(idx_info);
+    HDassert(count);
 
-    if(IOD_OBJ_INVALID == dset->remote_dset.mdkv_id) {
+    switch (obj->obj_type) {
+        case H5I_DATASET:
+            mdkv_id = ((H5VL_iod_dset_t *)obj)->remote_dset.mdkv_id;
+            break;
+        case H5I_FILE:
+            mdkv_id = ((H5VL_iod_file_t *)obj)->remote_file.mdkv_id;
+            break;
+        default:
+            HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "unsupported object type");
+            break;
+    }
+    if(IOD_OBJ_INVALID == mdkv_id) {
         /* Synchronously wait on the request attached to the dataset */
-        if(H5VL_iod_request_wait(dset->common.file, dset->common.request) < 0)
+        if(H5VL_iod_request_wait(obj->file, obj->request) < 0)
             HGOTO_ERROR(H5E_DATASET,  H5E_CANTGET, FAIL, "can't wait on HG request");
-        dset->common.request = NULL;
+        obj->request = NULL;
     }
 
-    /* get the RC object */
+    /* Get the RC object */
     if(NULL == (rc = (H5RC_t *)H5I_object_verify(rcxt_id, H5I_RC)))
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "not a READ CONTEXT ID");
 
-    if(NULL == (parent_reqs = (H5VL_iod_request_t **)
-            H5MM_malloc(sizeof(H5VL_iod_request_t *) * 2)))
+    /* Retrieve parent requests */
+    if(NULL == (parent_reqs = (H5VL_iod_request_t **)H5MM_malloc(sizeof(H5VL_iod_request_t *) * 2)))
         HGOTO_ERROR(H5E_SYM, H5E_NOSPACE, FAIL, "can't allocate parent req element");
-
-    /* retrieve parent requests */
-    if(H5VL_iod_get_parent_requests((H5VL_iod_object_t *)dset, (H5VL_iod_req_info_t *)rc,
-            parent_reqs, &num_parents) < 0)
+    if(H5VL_iod_get_parent_requests(obj, (H5VL_iod_req_info_t *)rc, parent_reqs, &num_parents) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, FAIL, "Failed to retrieve parent requests");
 
     /* Fill input structure */
-    input.coh = dset->common.file->remote_file.coh;
-    input.mdkv_id = dset->remote_dset.mdkv_id;
+    input.coh = obj->file->remote_file.coh;
+    input.mdkv_id = mdkv_id;
     input.rcxt_num = rc->c_version;
-    input.cs_scope = dset->common.file->md_integrity_scope;
+    input.cs_scope = obj->file->md_integrity_scope;
 
-    if (NULL == (output = (dset_get_index_info_out_t *)
-                 H5MM_calloc(sizeof(dset_get_index_info_out_t))))
+    if (NULL == (output = (idx_get_info_out_t *)H5MM_calloc(sizeof(idx_get_info_out_t))))
         HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, FAIL, "can't allocate output struct");
 
-    /* setup info struct for I/O request
+    /* Setup info struct for I/O request
        This is to manage the I/O operation once the wait is called. */
-    if (NULL == (info = (H5VL_iod_dataset_get_index_info_t *)
-                 H5MM_calloc(sizeof(H5VL_iod_dataset_get_index_info_t))))
+    if (NULL == (info = (H5VL_iod_index_get_info_t *)H5MM_calloc(sizeof(H5VL_iod_index_get_info_t))))
         HGOTO_ERROR(H5E_INDEX, H5E_NOSPACE, FAIL, "can't allocate info");
     info->count = count;
-    info->plugin_id = plugin_id;
-    info->metadata_size = metadata_size;
-    info->metadata = metadata;
+    info->idx_info = idx_info;
     info->output = output;
 
 #if H5_EFF_DEBUG
     printf("Get index info, axe id %"PRIu64"\n", g_axe_id);
 #endif
 
-    if(H5VL__iod_create_and_forward(H5VL_DSET_GET_INDEX_INFO_ID, HG_DSET_GET_INDEX_INFO,
-                                    (H5VL_iod_object_t *)dset, 0, num_parents, parent_reqs,
-                                    (H5VL_iod_req_info_t *)rc, &input, output, info, req) < 0)
+    if(H5VL__iod_create_and_forward(H5VL_IDX_GET_INFO_ID, HG_IDX_GET_INFO,
+        obj, 0, num_parents, parent_reqs, (H5VL_iod_req_info_t *)rc, &input,
+        output, info, req) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, FAIL, "failed to create and ship get index info");
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5VL_iod_dataset_get_index_info() */
+} /* end H5VL_iod_index_get_info() */
 
 /*-------------------------------------------------------------------------
- * Function:    H5VL_iod_dataset_remove_index_info
+ * Function:    H5VL_iod_index_remove_info
  *
  * Purpose: Remove index info attached to the dataset.
  *
@@ -10707,60 +10880,69 @@ done:
  *-------------------------------------------------------------------------
  */
 herr_t
-H5VL_iod_dataset_remove_index_info(void *_dset, hid_t trans_id, void **req)
+H5VL_iod_index_remove_info(void *_obj, hid_t trans_id, void **req)
 {
     H5VL_iod_request_t **parent_reqs = NULL;
-    H5VL_iod_dset_t *dset = (H5VL_iod_dset_t *) _dset;
-    dset_rm_index_info_in_t input;
+    H5VL_iod_object_t *obj = (H5VL_iod_object_t *)_obj;
+    idx_rm_info_in_t input;
     H5TR_t *tr = NULL;
     size_t num_parents = 0;
     int *status = NULL;
+    iod_obj_id_t mdkv_id;
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    HDassert(dset);
+    HDassert(obj);
 
-    if(IOD_OBJ_INVALID == dset->remote_dset.mdkv_id) {
+    switch (obj->obj_type) {
+        case H5I_DATASET:
+            mdkv_id = ((H5VL_iod_dset_t *)obj)->remote_dset.mdkv_id;
+            break;
+        case H5I_FILE:
+            mdkv_id = ((H5VL_iod_file_t *)obj)->remote_file.mdkv_id;
+            break;
+        default:
+            HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "unsupported object type");
+            break;
+    }
+    if(IOD_OBJ_INVALID == mdkv_id) {
         /* Synchronously wait on the request attached to the dataset */
-        if(H5VL_iod_request_wait(dset->common.file, dset->common.request) < 0)
+        if(H5VL_iod_request_wait(obj->file, obj->request) < 0)
             HGOTO_ERROR(H5E_DATASET,  H5E_CANTGET, FAIL, "can't wait on HG request");
-        dset->common.request = NULL;
+        obj->request = NULL;
     }
 
-    /* get the TR object */
+    /* Get the TR object */
     if(NULL == (tr = (H5TR_t *)H5I_object_verify(trans_id, H5I_TR)))
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "not a Transaction ID");
 
-    if(NULL == (parent_reqs = (H5VL_iod_request_t **)
-            H5MM_malloc(sizeof(H5VL_iod_request_t *) * 2)))
+    /* Retrieve parent requests */
+    if(NULL == (parent_reqs = (H5VL_iod_request_t **)H5MM_malloc(sizeof(H5VL_iod_request_t *) * 2)))
         HGOTO_ERROR(H5E_SYM, H5E_NOSPACE, FAIL, "can't allocate parent req element");
-
-    /* retrieve parent requests */
-    if(H5VL_iod_get_parent_requests((H5VL_iod_object_t *)dset, (H5VL_iod_req_info_t *)tr,
-            parent_reqs, &num_parents) < 0)
+    if(H5VL_iod_get_parent_requests(obj, (H5VL_iod_req_info_t *)tr, parent_reqs, &num_parents) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, FAIL, "Failed to retrieve parent requests");
 
     status = (int *)malloc(sizeof(int));
 
     /* Fill input structure */
-    input.coh = dset->common.file->remote_file.coh;
-    input.mdkv_id = dset->remote_dset.mdkv_id;
+    input.coh = obj->file->remote_file.coh;
+    input.mdkv_id = mdkv_id;
     input.trans_num = tr->trans_num;
-    input.cs_scope = dset->common.file->md_integrity_scope;
+    input.cs_scope = obj->file->md_integrity_scope;
 
 #if H5_EFF_DEBUG
     printf("Remove index info, axe id %"PRIu64"\n", g_axe_id);
 #endif
 
-    if(H5VL__iod_create_and_forward(H5VL_DSET_RM_INDEX_INFO_ID, HG_DSET_RM_INDEX_INFO,
-                                    (H5VL_iod_object_t *)dset, 0, num_parents, parent_reqs,
-                                    (H5VL_iod_req_info_t *)tr, &input, status, status, req) < 0)
+    if(H5VL__iod_create_and_forward(H5VL_IDX_RM_INFO_ID, HG_IDX_RM_INFO,
+        obj, 0, num_parents, parent_reqs, (H5VL_iod_req_info_t *)tr, &input,
+        status, status, req) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, FAIL, "failed to create and ship get index info");
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5VL_iod_dataset_remove_index_info() */
+} /* end H5VL_iod_index_remove_info() */
 
 /*-------------------------------------------------------------------------
  * Function:    H5VL_iod_get_filename
@@ -10776,6 +10958,6 @@ H5VL_iod_get_filename(H5VL_object_t *obj)
 {
     H5VL_iod_object_t *iod_obj = (H5VL_iod_object_t *) obj->vol_obj;
     return (const char *)iod_obj->file->file_name;
-}
+} /* end H5VL_iod_get_filename() */
 
 #endif /* H5_HAVE_EFF */

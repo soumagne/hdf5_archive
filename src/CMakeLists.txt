@@ -656,6 +656,7 @@ IF (HDF5_ENABLE_EFF)
         ${HDF5_SRC_DIR}/H5FF_obj.c
         ${HDF5_SRC_DIR}/H5FF_index.c
         ${HDF5_SRC_DIR}/H5FF_index_dummy.c
+        ${HDF5_SRC_DIR}/H5FF_index_meta_dummy.c
         ${HDF5_SRC_DIR}/H5FF_query.c
         ${HDF5_SRC_DIR}/H5FF_ref.c
         ${HDF5_SRC_DIR}/H5M.c

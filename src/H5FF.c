@@ -926,50 +926,6 @@ H5Dopen_ff(hid_t loc_id, const char *name, hid_t dapl_id, hid_t rcxt_id, hid_t e
     if((ret_value = H5VL_register_id(H5I_DATASET, dset, obj->vol_info, TRUE)) < 0)
 	HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to atomize dataset handle")
 
-#ifdef H5_HAVE_INDEXING
-    {
-        H5X_class_t *idx_class = NULL;
-        void *idx_handle = NULL;
-        unsigned plugin_id;
-        size_t metadata_size;
-        size_t idx_count;
-        void *metadata = NULL;
-        H5P_genplist_t *xapl_plist; /* Property list pointer */
-        hid_t xapl_id = H5P_INDEX_ACCESS_DEFAULT;
-
-        /* Get index info if present */
-        if (FAIL == H5VL_iod_dataset_get_index_info(dset, &idx_count, &plugin_id,
-                &metadata_size, &metadata, rcxt_id, NULL))
-            HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get index info for dataset");
-
-        if (idx_count) {
-            /* store the read context ID in the xapl */
-            if(NULL == (xapl_plist = (H5P_genplist_t *)H5I_object(xapl_id)))
-                HGOTO_ERROR(H5E_ATOM, H5E_BADATOM, FAIL, "can't find object for ID");
-            if(H5P_set(xapl_plist, H5VL_CONTEXT_ID, &rcxt_id) < 0)
-                HGOTO_ERROR(H5E_PLIST, H5E_CANTGET, FAIL, "can't set property value for trans_id");
-
-            if (NULL == (idx_class = H5X_registered(plugin_id)))
-                HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get index plugin class");
-
-            /* Call open of index plugin */
-            if (NULL == idx_class->open)
-                HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin open callback is not defined");
-            if (NULL == (idx_handle = idx_class->open(loc_id, ret_value, xapl_id,
-                    metadata_size, metadata)))
-                HGOTO_ERROR(H5E_INDEX, H5E_CANTOPENOBJ, FAIL, "indexing open callback failed");
-
-            /* Add idx_handle to dataset */
-            if (FAIL == H5VL_iod_dataset_set_index(dset, idx_handle))
-                HGOTO_ERROR(H5E_INDEX, H5E_CANTSET, FAIL, "cannot set index to dataset");
-            if (FAIL == H5VL_iod_dataset_set_index_plugin_id(dset, plugin_id))
-                HGOTO_ERROR(H5E_INDEX, H5E_CANTSET, FAIL, "cannot set index plugin ID to dataset");
-        }
-        /* No longer need metadata */
-        H5MM_free(metadata);
-    }
-#endif /* H5_HAVE_INDEXING */
-
 done:
     if (ret_value < 0 && dset)
         if(H5VL_dataset_close (dset, obj->vol_info->vol_cls, dxpl_id, H5_REQUEST_NULL) < 0)
@@ -997,9 +953,6 @@ H5Dwrite_ff(hid_t dset_id, hid_t mem_type_id, hid_t mem_space_id,
             hid_t trans_id, hid_t estack_id)
 {
     H5VL_object_t   *dset = NULL;
-#ifdef H5_HAVE_INDEXING
-    void       *idx_handle;
-#endif
     H5P_genplist_t *plist;     /* Property list pointer */
     H5_priv_request_t *request = NULL; /* private request struct inserted in event queue */
     void **req = NULL; /* pointer to plugin generate requests (Stays NULL if plugin does not support async */
@@ -1027,32 +980,6 @@ H5Dwrite_ff(hid_t dset_id, hid_t mem_type_id, hid_t mem_space_id,
         HGOTO_ERROR(H5E_ATOM, H5E_BADATOM, FAIL, "can't find object for ID")
     if(H5P_set(plist, H5VL_TRANS_ID, &trans_id) < 0)
         HGOTO_ERROR(H5E_PLIST, H5E_CANTGET, FAIL, "can't set property value for trans_id")
-
-#ifdef H5_HAVE_INDEXING
-    /* Get the index handle */
-    if (NULL != (idx_handle = H5VL_iod_dataset_get_index(dset->vol_obj))) {
-        H5X_class_t *idx_class = NULL;
-        H5P_genplist_t *xxpl_plist; /* Property list pointer */
-        unsigned plugin_id;
-        hid_t xxpl_id = H5P_INDEX_XFER_DEFAULT;
-
-        /* store the transaction ID in the xxpl */
-        if(NULL == (xxpl_plist = (H5P_genplist_t *)H5I_object(xxpl_id)))
-            HGOTO_ERROR(H5E_ATOM, H5E_BADATOM, FAIL, "can't find object for ID")
-        if(H5P_set(xxpl_plist, H5VL_TRANS_ID, &trans_id) < 0)
-            HGOTO_ERROR(H5E_PLIST, H5E_CANTGET, FAIL, "can't set property value for trans_id")
-
-        if (!(plugin_id = H5VL_iod_dataset_get_index_plugin_id(dset->vol_obj)))
-            HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get index plugin ID from dataset");
-        if (NULL == (idx_class = H5X_registered(plugin_id)))
-            HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get index plugin class");
-
-        if (NULL == idx_class->pre_update)
-            HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin pre_update callback is not defined");
-        if (FAIL == idx_class->pre_update(idx_handle, mem_space_id, xxpl_id))
-            HGOTO_ERROR(H5E_INDEX, H5E_CANTUPDATE, FAIL, "cannot execute index pre_update operation");
-    }
-#endif
 
     if(estack_id != H5_EVENT_STACK_NULL) {
         /* create the private request */
@@ -1222,10 +1149,6 @@ done:
 herr_t
 H5Dclose_ff(hid_t dset_id, hid_t estack_id)
 {
-#ifdef H5_HAVE_INDEXING
-    unsigned plugin_id;
-    void *idx_handle = NULL;
-#endif
     H5VL_object_t *dset;
     herr_t       ret_value = SUCCEED;   /* Return value */
 
@@ -1240,13 +1163,6 @@ H5Dclose_ff(hid_t dset_id, hid_t estack_id)
     dset->close_estack_id = estack_id;
     dset->close_dxpl_id = H5AC_dxpl_id;
 
-#ifdef H5_HAVE_INDEXING
-    /* Get the index handle if there is one */
-    idx_handle = H5VL_iod_dataset_get_index(dset->vol_obj);
-    if (idx_handle && !(plugin_id = H5VL_iod_dataset_get_index_plugin_id(dset->vol_obj)))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get index plugin ID from dataset");
-#endif
-
     /*
      * Decrement the counter on the dataset.  It will be freed if the count
      * reaches zero.  
@@ -1257,23 +1173,6 @@ H5Dclose_ff(hid_t dset_id, hid_t estack_id)
      */
     if(H5I_dec_app_ref_always_close(dset_id) < 0)
 	HGOTO_ERROR(H5E_DATASET, H5E_CANTDEC, FAIL, "can't decrement count on dataset ID")
-
-#ifdef H5_HAVE_INDEXING
-	/*
-	 * Close the index if the dataset is now closed
-	 */
-	if (idx_handle && (FAIL == H5I_get_ref(dset_id, FALSE))) {
-        H5X_class_t *idx_class = NULL;
-
-        if (NULL == (idx_class = H5X_registered(plugin_id)))
-            HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get index plugin class");
-
-        if (NULL == idx_class->close)
-            HGOTO_ERROR(H5E_INDEX, H5E_BADVALUE, FAIL, "plugin close callback is not defined");
-        if (FAIL == idx_class->close(idx_handle))
-            HGOTO_ERROR(H5E_INDEX, H5E_CANTCLOSEOBJ, FAIL, "cannot close index");
-	}
-#endif
 
 done:
     FUNC_LEAVE_API(ret_value)
@@ -3078,7 +2977,7 @@ H5D__apply_index_query(void *idx_handle, H5X_class_t *idx_class, hid_t query_id,
         HGOTO_ERROR_FF(FAIL, "can't get query op type");
 
     if(H5Q_SINGLETON == comb_type) {
-        if (FAIL == idx_class->query(idx_handle, query_id, xxpl_id, space_id))
+        if (FAIL == idx_class->idx_class.data_class.query(idx_handle, query_id, xxpl_id, space_id))
             HGOTO_ERROR(H5E_INDEX, H5E_CANTCLOSEOBJ, FAIL, "cannot query index");
     }
     else {

@@ -24,6 +24,7 @@
 #include "H5Sprivate.h"
 #include "H5RCprivate.h"     /* Read contexts */
 #include "H5TRprivate.h"     /* Transactions */
+#include "H5Xprivate.h"      /* Index */
 #include "H5VLiod_common.h"
 
 #ifdef H5_HAVE_EFF
@@ -98,9 +99,9 @@ typedef enum H5RQ_type_t {
     HG_TR_ABORT,
     HG_PREFETCH,
     HG_EVICT,
-    HG_DSET_SET_INDEX_INFO,
-    HG_DSET_GET_INDEX_INFO,
-    HG_DSET_RM_INDEX_INFO,
+    HG_IDX_SET_INFO,
+    HG_IDX_GET_INFO,
+    HG_IDX_RM_INFO,
     HG_VIEW_CREATE
 } H5RQ_type_t;
 
@@ -251,6 +252,10 @@ typedef struct H5VL_iod_file_t {
     unsigned nopen_objs;
     H5VL_iod_request_t *request_list_head;
     H5VL_iod_request_t *request_list_tail;
+
+    void               *idx_handle;     /* Handle for the index */
+    H5X_class_t        *idx_class;      /* Class for the index */
+    H5O_idxinfo_t       idx_info;       /* Index information */
 } H5VL_iod_file_t;
 
 /* the client side attribute struct */
@@ -281,8 +286,10 @@ typedef struct H5VL_iod_dset_t {
     hid_t dapl_id;
     hbool_t is_virtual;
     H5O_storage_virtual_t virtual_storage;
-    void *idx_handle;
-    unsigned idx_plugin_id;
+
+    void               *idx_handle;     /* Handle for the index */
+    H5X_class_t        *idx_class;      /* Class for the index */
+    H5O_idxinfo_t       idx_info;       /* Index information */
 } H5VL_iod_dset_t;
 
 /* the client side datatype struct */
@@ -317,7 +324,7 @@ typedef struct H5VL_iod_write_info_t {
     char *vl_lengths;
     H5VL_iod_dset_t *dset;
     void *idx_handle;
-    unsigned idx_plugin_id;
+    H5X_class_t *idx_class;
     void *buf;
     hid_t dataspace_id;
     hid_t trans_id;
@@ -335,12 +342,6 @@ typedef struct H5VL_iod_multi_write_info_t {
     void *status;
     size_t count;
     H5VL_iod_multi_write_info_ent_t *list;
-    H5VL_iod_dset_t *dset;
-    void *idx_handle;
-    unsigned idx_plugin_id;
-    void *buf;
-    hid_t dataspace_id;
-    hid_t trans_id;
 } H5VL_iod_multi_write_info_t;
 
 /* status of a read operation after it completes */
@@ -448,13 +449,11 @@ typedef struct H5VL_iod_link_iter_info_t {
 } H5VL_iod_link_iter_info_t;
 
 /* information about a dataset write request */
-typedef struct H5VL_iod_dataset_get_index_info_t {
+typedef struct H5VL_iod_index_get_info_t {
     size_t *count;
-    unsigned *plugin_id;
-    size_t *metadata_size;
-    void **metadata;
-    dset_get_index_info_out_t *output;
-} H5VL_iod_dataset_get_index_info_t;
+    H5O_idxinfo_t *idx_info;
+    idx_get_info_out_t *output;
+} H5VL_iod_index_get_info_t;
 
 H5_DLL herr_t H5VL_iod_request_delete(H5VL_iod_file_t *file, H5VL_iod_request_t *request);
 H5_DLL herr_t H5VL_iod_request_add(H5VL_iod_file_t *file, H5VL_iod_request_t *request);
@@ -556,18 +555,18 @@ H5_DLL herr_t H5VL_iod_analysis_invoke(const char *file_name, hid_t query_id,
                                        const char *split_script, const char *combine_script,
                                        const char *integrate_script, void **req);
 
-/* private routines for X */
-H5_DLL herr_t H5VL_iod_dataset_set_index(void *dset, void *idx_handle);
-H5_DLL void *H5VL_iod_dataset_get_index(void *dset);
-H5_DLL herr_t H5VL_iod_dataset_set_index_plugin_id(void *dset, unsigned plugin_id);
-H5_DLL unsigned H5VL_iod_dataset_get_index_plugin_id(void *dset);
-H5_DLL herr_t H5VL_iod_dataset_set_index_info(void *dset, unsigned plugin_id,
-        size_t metadata_size, void *metadata, hid_t trans_id, void **req);
-H5_DLL herr_t H5VL_iod_dataset_get_index_info(void *dset, size_t *count,
-        unsigned *plugin_id, size_t *metadata_size, void **metadata,
-        hid_t trans_id, void **req);
-H5_DLL herr_t H5VL_iod_dataset_remove_index_info(void *dset, hid_t trans_id,
-        void **req);
+H5_DLL herr_t H5VL_iod_index_set(void *obj, H5X_class_t *idx_class,
+    void *idx_handle, H5O_idxinfo_t *idx_info, hid_t trans_id);
+H5_DLL herr_t H5VL_iod_index_get(void *obj, H5X_class_t **idx_class,
+    void **idx_handle, H5O_idxinfo_t **idx_info, unsigned *actual_count);
+H5_DLL herr_t H5VL_iod_index_open(hid_t obj_id, void *obj, hid_t xapl_id);
+H5_DLL herr_t H5VL_iod_index_close(void *obj);
+H5_DLL herr_t H5VL_iod_index_set_info(void *obj, H5O_idxinfo_t *idx_info,
+    hid_t trans_id, void **req);
+H5_DLL herr_t H5VL_iod_index_get_info(void *obj, H5O_idxinfo_t *idx_info,
+    unsigned *count, hid_t rcxt_id, void **req);
+H5_DLL herr_t H5VL_iod_index_remove_info(void *obj, hid_t trans_id, void **req);
+
 H5_DLL const char *H5VL_iod_get_filename(H5VL_object_t *obj);
 
 herr_t H5VL_iod_datatype_close(void *dt, hid_t dxpl_id, void **req);

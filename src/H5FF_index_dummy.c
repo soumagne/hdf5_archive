@@ -106,7 +106,8 @@ const H5X_class_t H5X_DUMMY_FF[1] = {{
     H5X_CLASS_T_VERS,       /* (From the H5Xpublic.h header file) */
     H5X_PLUGIN_DUMMY_FF,    /* (Or whatever number is assigned) */
     "dummy index plugin",   /* Whatever name desired */
-    H5X_TYPE_DATA_ELEM,     /* This plugin operates on dataset elements */
+    H5X_TYPE_DATA,          /* This plugin operates on dataset elements */
+    {{
     H5X_dummy_create,       /* create */
     H5X_dummy_remove,       /* remove */
     H5X_dummy_open,         /* open */
@@ -116,7 +117,8 @@ const H5X_class_t H5X_DUMMY_FF[1] = {{
     H5X_dummy_query,        /* query */
     NULL,                   /* refresh */
     NULL,                   /* copy */
-    NULL                   /* get_size */
+    NULL                    /* get_size */
+    }}
 }};
 
 /*-------------------------------------------------------------------------

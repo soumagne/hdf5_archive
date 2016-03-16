@@ -101,9 +101,9 @@ extern hg_id_t H5VL_PREFETCH_ID;
 extern hg_id_t H5VL_EVICT_ID;
 extern hg_id_t H5VL_CANCEL_OP_ID;
 extern hg_id_t H5VL_VIEW_CREATE_ID;
-extern hg_id_t H5VL_DSET_SET_INDEX_INFO_ID;
-extern hg_id_t H5VL_DSET_GET_INDEX_INFO_ID;
-extern hg_id_t H5VL_DSET_RM_INDEX_INFO_ID;
+extern hg_id_t H5VL_IDX_SET_INFO_ID;
+extern hg_id_t H5VL_IDX_GET_INFO_ID;
+extern hg_id_t H5VL_IDX_RM_INFO_ID;
 
 /* Structure for a span of fixed-length data in a type */
  typedef struct H5VL_iod_fl_span_t {
@@ -236,9 +236,9 @@ H5_DLL herr_t EFF_setup_coresident(MPI_Comm comm, MPI_Info info);
 H5_DLL herr_t EFF_terminate_coresident(void);
 H5_DLL void EFF__mercury_register_callbacks(void);
 
-H5_DLL int H5VL_iod_server_dset_set_index_info(hg_handle_t handle);
-H5_DLL int H5VL_iod_server_dset_get_index_info(hg_handle_t handle);
-H5_DLL int H5VL_iod_server_dset_remove_index_info(hg_handle_t handle);
+H5_DLL int H5VL_iod_server_index_set_info(hg_handle_t handle);
+H5_DLL int H5VL_iod_server_index_get_info(hg_handle_t handle);
+H5_DLL int H5VL_iod_server_index_remove_info(hg_handle_t handle);
 
 H5_DLL int H5VL_iod_server_eff_init(hg_handle_t handle);
 H5_DLL int H5VL_iod_server_eff_finalize(hg_handle_t handle);
@@ -969,7 +969,7 @@ MERCURY_GEN_PROC(view_create_out_t,
                  ((attr_info_t)(attr_info))
                  ((region_info_t)(region_info)))
 
-MERCURY_GEN_PROC(dset_set_index_info_in_t,
+MERCURY_GEN_PROC(idx_set_info_in_t,
                  ((axe_t)(axe_info))
                  ((iod_handle_t)(coh))
                  ((uint32_t)(cs_scope))
@@ -977,18 +977,18 @@ MERCURY_GEN_PROC(dset_set_index_info_in_t,
                  ((iod_obj_id_t)(mdkv_id))
                  ((uint32_t)(idx_plugin_id))
                  ((binary_buf_t)(idx_metadata)))
-MERCURY_GEN_PROC(dset_get_index_info_in_t,
+MERCURY_GEN_PROC(idx_get_info_in_t,
                  ((axe_t)(axe_info))
                  ((iod_handle_t)(coh))
                  ((uint32_t)(cs_scope))
                  ((uint64_t)(rcxt_num))
                  ((iod_obj_id_t)(mdkv_id)))
-MERCURY_GEN_PROC(dset_get_index_info_out_t,
+MERCURY_GEN_PROC(idx_get_info_out_t,
                  ((int32_t)(ret))
                  ((uint64_t)(idx_count))
                  ((uint32_t)(idx_plugin_id))
                  ((binary_buf_t)(idx_metadata)))
-MERCURY_GEN_PROC(dset_rm_index_info_in_t,
+MERCURY_GEN_PROC(idx_rm_info_in_t,
                  ((axe_t)(axe_info))
                  ((uint32_t)(cs_scope))
                  ((uint64_t)(trans_num))

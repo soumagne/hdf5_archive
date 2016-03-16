@@ -26,7 +26,7 @@
 
 
 /*-------------------------------------------------------------------------
- * Function:	H5VL_iod_server_dset_set_index_info_cb
+ * Function:	H5VL_iod_server_index_set_info_cb
  *
  * Purpose:	Stored index information of the dataset.
  *
@@ -39,13 +39,13 @@
  *-------------------------------------------------------------------------
  */
 void
-H5VL_iod_server_dset_set_index_info_cb(AXE_engine_t H5_ATTR_UNUSED axe_engine, 
+H5VL_iod_server_index_set_info_cb(AXE_engine_t H5_ATTR_UNUSED axe_engine,
                                size_t H5_ATTR_UNUSED num_n_parents, AXE_task_t H5_ATTR_UNUSED n_parents[], 
                                size_t H5_ATTR_UNUSED num_s_parents, AXE_task_t H5_ATTR_UNUSED s_parents[], 
                                void *_op_data)
 {
     op_data_t *op_data = (op_data_t *)_op_data;
-    dset_set_index_info_in_t *input = (dset_set_index_info_in_t *)op_data->input;
+    idx_set_info_in_t *input = (idx_set_info_in_t *)op_data->input;
     iod_handle_t coh = input->coh; /* container handle */
     iod_obj_id_t mdkv_id = input->mdkv_id; /* The ID of the metadata KV to be created */
     iod_trans_id_t wtid = input->trans_num;
@@ -119,14 +119,14 @@ done:
 
     HG_Handler_free_input(op_data->hg_handle, input);
     HG_Handler_free(op_data->hg_handle);
-    input = (dset_set_index_info_in_t *)H5MM_xfree(input);
+    input = (idx_set_info_in_t *)H5MM_xfree(input);
     op_data = (op_data_t *)H5MM_xfree(op_data);
 
-} /* end H5VL_iod_server_dset_set_index_info_cb() */
+} /* end H5VL_iod_server_index_set_info_cb() */
 
 
 /*-------------------------------------------------------------------------
- * Function:	H5VL_iod_server_dset_get_index_info_cb
+ * Function:	H5VL_iod_server_index_get_info_cb
  *
  * Purpose:	Stored index information of the dataset.
  *
@@ -139,14 +139,14 @@ done:
  *-------------------------------------------------------------------------
  */
 void
-H5VL_iod_server_dset_get_index_info_cb(AXE_engine_t H5_ATTR_UNUSED axe_engine, 
+H5VL_iod_server_index_get_info_cb(AXE_engine_t H5_ATTR_UNUSED axe_engine,
                                size_t H5_ATTR_UNUSED num_n_parents, AXE_task_t H5_ATTR_UNUSED n_parents[], 
                                size_t H5_ATTR_UNUSED num_s_parents, AXE_task_t H5_ATTR_UNUSED s_parents[], 
                                void *_op_data)
 {
     op_data_t *op_data = (op_data_t *)_op_data;
-    dset_get_index_info_in_t *input = (dset_get_index_info_in_t *)op_data->input;
-    dset_get_index_info_out_t output;
+    idx_get_info_in_t *input = (idx_get_info_in_t *)op_data->input;
+    idx_get_info_out_t output;
     iod_handle_t coh = input->coh; /* container handle */
     iod_obj_id_t mdkv_id = input->mdkv_id; /* The ID of the metadata KV to be created */
     iod_trans_id_t rtid = input->rcxt_num;
@@ -262,14 +262,14 @@ done:
 
     HG_Handler_free_input(op_data->hg_handle, input);
     HG_Handler_free(op_data->hg_handle);
-    input = (dset_get_index_info_in_t *)H5MM_xfree(input);
+    input = (idx_get_info_in_t *)H5MM_xfree(input);
     op_data = (op_data_t *)H5MM_xfree(op_data);
 
-} /* end H5VL_iod_server_dset_get_index_info_cb() */
+} /* end H5VL_iod_server_index_get_info_cb() */
 
 
 /*-------------------------------------------------------------------------
- * Function:	H5VL_iod_server_dset_remove_index_info_cb
+ * Function:	H5VL_iod_server_index_remove_info_cb
  *
  * Purpose:	Stored index information of the dataset.
  *
@@ -282,13 +282,13 @@ done:
  *-------------------------------------------------------------------------
  */
 void
-H5VL_iod_server_dset_remove_index_info_cb(AXE_engine_t H5_ATTR_UNUSED axe_engine, 
+H5VL_iod_server_index_remove_info_cb(AXE_engine_t H5_ATTR_UNUSED axe_engine,
                                size_t H5_ATTR_UNUSED num_n_parents, AXE_task_t H5_ATTR_UNUSED n_parents[], 
                                size_t H5_ATTR_UNUSED num_s_parents, AXE_task_t H5_ATTR_UNUSED s_parents[], 
                                void *_op_data)
 {
     op_data_t *op_data = (op_data_t *)_op_data;
-    dset_rm_index_info_in_t *input = (dset_rm_index_info_in_t *)op_data->input;
+    idx_rm_info_in_t *input = (idx_rm_info_in_t *)op_data->input;
     iod_handle_t coh = input->coh; /* container handle */
     iod_obj_id_t mdkv_id = input->mdkv_id; /* The ID of the metadata KV to be created */
     iod_trans_id_t wtid = input->trans_num;
@@ -341,9 +341,9 @@ done:
 
     HG_Handler_free_input(op_data->hg_handle, input);
     HG_Handler_free(op_data->hg_handle);
-    input = (dset_rm_index_info_in_t *)H5MM_xfree(input);
+    input = (idx_rm_info_in_t *)H5MM_xfree(input);
     op_data = (op_data_t *)H5MM_xfree(op_data);
 
-} /* end H5VL_iod_server_dset_remove_index_info_cb() */
+} /* end H5VL_iod_server_index_remove_info_cb() */
 
 #endif /* H5_HAVE_EFF */
