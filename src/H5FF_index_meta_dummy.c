@@ -536,7 +536,7 @@ H5X__dummy_metadata_free(H5X_dummy_metadata_t *metadata)
             H5X_dummy_entry_t *entry = H5Q_QUEUE_FIRST(entries[i]);
             H5Q_QUEUE_REMOVE_HEAD(entries[i], entry);
             /* TODO call H5Rdestroy */
-            H5Rdestroy(entry->ref);
+//            H5Rdestroy(entry->ref);
             switch (entry->type) {
                 case H5Q_TYPE_ATTR_VALUE:
                     if (FAIL == H5Tclose(entry->key.elem.type))
@@ -883,8 +883,7 @@ H5X__dummy_create(hid_t loc_id, hid_t H5_ATTR_UNUSED xcpl_id, hid_t xapl_id,
     H5Q_QUEUE_INIT(&dummy->metadata.link_names);
 
     /* Get file ID */
-    if (FAIL == (file_id = H5Iget_file_id(loc_id)))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get file ID");
+    file_id = loc_id; /* TODO for now */
 
     /* Get transaction ID from xapl */
     if (FAIL == H5Pget_xapl_transaction(xapl_id, &trans_id))
@@ -1067,15 +1066,14 @@ H5X__dummy_query(void *idx_handle, hid_t query_id, hid_t xxpl_id,
     if (FAIL == H5X__dummy_metadata_query(&dummy->metadata, query_id, &query_result))
         HGOTO_ERROR(H5E_INDEX, H5E_CANTCOMPARE, FAIL, "can't query metadata");
 
-
-    H5X_DUMMY_LOG_DEBUG("###########################");
-    if (!H5Q_QUEUE_EMPTY(&query_result)) {
-        H5X_dummy_entry_t *entry;
-        H5X_DUMMY_LOG_DEBUG("Query returns %zu references", query_result.n_elem);
-        H5Q_QUEUE_FOREACH(entry, &query_result, entry)
-            printf_ref(entry->ref);
-    }
-    H5X_DUMMY_LOG_DEBUG("###########################");
+//    H5X_DUMMY_LOG_DEBUG("###########################");
+//    if (!H5Q_QUEUE_EMPTY(&query_result)) {
+//        H5X_dummy_entry_t *entry;
+//        H5X_DUMMY_LOG_DEBUG("Query returns %zu references", query_result.n_elem);
+//        H5Q_QUEUE_FOREACH(entry, &query_result, entry)
+//            printf_ref(entry->ref);
+//    }
+//    H5X_DUMMY_LOG_DEBUG("###########################");
 
     /* Fill result */
     if (!H5Q_QUEUE_EMPTY(&query_result)) {

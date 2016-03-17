@@ -1569,6 +1569,10 @@ H5VL_iod_file_close(void *_file, hid_t H5_ATTR_UNUSED dxpl_id, void **req)
             HGOTO_ERROR(H5E_FILE,  H5E_CANTGET, FAIL, "can't wait on all object requests");
     }
 
+    /* Close index object*/
+    if (file->idx_handle && (FAIL == H5VL_iod_index_close(file)))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTCLOSEOBJ, FAIL, "cannot close index")
+
     /* allocate an integer to receive the return value if the file close succeeded or not */
     status = (int *)malloc(sizeof(int));
 
@@ -1647,10 +1651,6 @@ H5VL_iod_file_close(void *_file, hid_t H5_ATTR_UNUSED dxpl_id, void **req)
                                     num_parents, parent_reqs,
                                     NULL, &input, status, status, req) < 0)
         HGOTO_ERROR(H5E_SYM, H5E_CANTINIT, FAIL, "failed to create and ship file close");
-
-    /* Close index object*/
-    if (file->idx_handle && (FAIL == H5VL_iod_index_close(file)))
-        HGOTO_ERROR(H5E_DATASET, H5E_CANTCLOSEOBJ, FAIL, "cannot close index")
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
