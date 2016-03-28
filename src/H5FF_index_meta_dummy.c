@@ -1081,7 +1081,7 @@ H5X__dummy_insert_entry(void *idx_handle, hid_t obj_id, H5Q_type_t key_type,
             /* Keep attribute reference */
             if (NULL == (ref = H5R_create_ext_attr(file_name, loc_name, attr_name)))
                 HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't get buffer size for attribute reference");
-            if (FAIL == H5X__dummy_metadata_add(dummy->metadata, ref, H5Q_TYPE_ATTR_VALUE, key->value.type, key->value.value))
+            if (FAIL == H5X__dummy_metadata_add(&dummy->metadata, ref, H5Q_TYPE_ATTR_VALUE, key->value.type, key->value.value))
                 HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
         }
             break;
@@ -1090,7 +1090,7 @@ H5X__dummy_insert_entry(void *idx_handle, hid_t obj_id, H5Q_type_t key_type,
             /* Keep attribute reference */
             if (NULL == (ref = H5R_create_ext_attr(file_name, loc_name, key->name)))
                 HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't get buffer size for attribute reference");
-            if (FAIL == H5X__dummy_metadata_add(dummy->metadata, ref, H5Q_TYPE_ATTR_NAME, key->name))
+            if (FAIL == H5X__dummy_metadata_add(&dummy->metadata, ref, H5Q_TYPE_ATTR_NAME, key->name))
                 HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
         }
             break;
@@ -1099,7 +1099,7 @@ H5X__dummy_insert_entry(void *idx_handle, hid_t obj_id, H5Q_type_t key_type,
             /* Keep object reference */
             if (NULL == (ref = H5R_create_ext_object(file_name, loc_name)))
                 HGOTO_ERROR(H5E_DATASET, H5E_CANTCREATE, FAIL, "can't create object reference");
-            if (FAIL == H5X__dummy_metadata_add(dummy->metadata, ref, H5Q_TYPE_LINK_NAME, key->name))
+            if (FAIL == H5X__dummy_metadata_add(&dummy->metadata, ref, H5Q_TYPE_LINK_NAME, key->name))
                 HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
         }
         break;
