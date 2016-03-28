@@ -177,8 +177,13 @@ static herr_t H5X__dummy_remove(hid_t loc_id, size_t metadata_size,
 static void *H5X__dummy_open(hid_t loc_id, hid_t xapl_id, size_t
     metadata_size, void *metadata);
 static herr_t H5X__dummy_close(void *idx_handle);
+static herr_t H5X__dummy_insert_entry(void *idx_handle, hid_t obj_id,
+    H5Q_type_t key_type, H5Q_elem_t *key, hid_t xxpl_id);
+static herr_t H5X__dummy_remove_entry(void *idx_handle, hid_t obj_id,
+    H5Q_type_t key_type, H5Q_elem_t *key, hid_t xxpl_id);
 static herr_t H5X__dummy_query(void *idx_handle, hid_t query_id, hid_t xxpl_id,
     size_t *ref_count, href_t *refs[]);
+
 
 /*********************/
 /* Package Variables */
@@ -203,8 +208,8 @@ const H5X_class_t H5X_META_DUMMY_FF[1] = {{
     H5X__dummy_remove,          /* remove */
     H5X__dummy_open,            /* open */
     H5X__dummy_close,           /* close */
-    NULL,                       /* insert_entry */
-    NULL,                       /* remove_entry */
+    H5X__dummy_insert_entry,    /* insert_entry */
+    H5X__dummy_remove_entry,    /* remove_entry */
     H5X__dummy_query,           /* query */
     NULL                        /* get_size */
     }}
@@ -1033,6 +1038,105 @@ H5X__dummy_close(void *idx_handle)
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5X_dummy_close() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5X__dummy_insert_entry
+ *
+ * Purpose: This function insert a new entry in the dummy plugin index.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5X__dummy_insert_entry(void *idx_handle, hid_t obj_id, H5Q_type_t key_type,
+    H5Q_elem_t *key, hid_t xxpl_id)
+{
+    H5X_dummy_t *dummy = (H5X_dummy_t *) idx_handle;
+    char file_name[H5X_DUMMY_MAX_NAME_LEN];
+    char loc_name[H5X_DUMMY_MAX_NAME_LEN];
+    href_t ref;
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    H5X_DUMMY_LOG_DEBUG("Calling H5X__dummy_insert_entry");
+
+    if (NULL == dummy)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "NULL index handle");
+
+    if (H5Fget_name(obj_id, file_name, H5X_DUMMY_MAX_NAME_LEN) < 0)
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get file name");
+    if (H5Iget_name(obj_id, loc_name, H5X_DUMMY_MAX_NAME_LEN) < 0)
+        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get location name");
+
+    switch (key_type) {
+        case H5Q_TYPE_ATTR_VALUE:
+        {
+            char attr_name[H5X_DUMMY_MAX_NAME_LEN];
+
+            if (H5Aget_name(obj_id, H5X_DUMMY_MAX_NAME_LEN, attr_name) < 0)
+                HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, FAIL, "can't get attribute name");
+
+            /* Keep attribute reference */
+            if (NULL == (ref = H5R_create_ext_attr(file_name, loc_name, attr_name)))
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't get buffer size for attribute reference");
+            if (FAIL == H5X__dummy_metadata_add(dummy->metadata, ref, H5Q_TYPE_ATTR_VALUE, key->value.type, key->value.value))
+                HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
+        }
+            break;
+        case H5Q_TYPE_ATTR_NAME:
+        {
+            /* Keep attribute reference */
+            if (NULL == (ref = H5R_create_ext_attr(file_name, loc_name, key->name)))
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "can't get buffer size for attribute reference");
+            if (FAIL == H5X__dummy_metadata_add(dummy->metadata, ref, H5Q_TYPE_ATTR_NAME, key->name))
+                HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
+        }
+            break;
+        case H5Q_TYPE_LINK_NAME:
+        {
+            /* Keep object reference */
+            if (NULL == (ref = H5R_create_ext_object(file_name, loc_name)))
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTCREATE, FAIL, "can't create object reference");
+            if (FAIL == H5X__dummy_metadata_add(dummy->metadata, ref, H5Q_TYPE_LINK_NAME, key->name))
+                HGOTO_ERROR(H5E_QUERY, H5E_CANTAPPEND, FAIL, "can't append object reference to view");
+        }
+        break;
+        case H5Q_TYPE_MISC:
+        default:
+            HGOTO_ERROR(H5E_QUERY, H5E_BADTYPE, FAIL, "unsupported/unrecognized query type");
+            break;
+    }
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_insert_entry() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5X__dummy_remove_entry
+ *
+ * Purpose: This function removes an entry from the dummy plugin index.
+ *
+ * Return:  Non-negative on success/Negative on failure
+ *
+ *-------------------------------------------------------------------------
+ */
+static herr_t
+H5X__dummy_remove_entry(void H5_ATTR_UNUSED *idx_handle, hid_t H5_ATTR_UNUSED obj_id,
+    H5Q_type_t H5_ATTR_UNUSED key_type, H5Q_elem_t H5_ATTR_UNUSED *key,
+    hid_t H5_ATTR_UNUSED xxpl_id)
+{
+    herr_t ret_value = SUCCEED; /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT_NOERR
+
+    H5X_DUMMY_LOG_DEBUG("Calling H5X__dummy_remove_entry");
+
+    /* TODO Does not do anything */
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5X__dummy_insert_entry() */
 
 /*-------------------------------------------------------------------------
  * Function:    H5X_dummy_query
