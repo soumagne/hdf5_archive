@@ -214,7 +214,7 @@ H5R_create_object(H5G_loc_t *loc, const char *name, hid_t dxpl_id)
     H5G_name_t path;            /* Object group hier. path */
     H5O_loc_t oloc;             /* Object object location */
     hbool_t obj_found = FALSE;  /* Object location found */
-    struct href_t *ret_value = NULL; /* Return value */
+    struct href *ret_value = NULL; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
@@ -231,7 +231,7 @@ H5R_create_object(H5G_loc_t *loc, const char *name, hid_t dxpl_id)
         HGOTO_ERROR(H5E_REFERENCE, H5E_NOTFOUND, NULL, "object not found")
     obj_found = TRUE;
 
-    if(NULL == (ret_value = (struct href_t *)H5MM_malloc(sizeof(struct href_t))))
+    if(NULL == (ret_value = (struct href *)H5MM_malloc(sizeof(struct href))))
         HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, NULL, "Cannot allocate memory for reference")
 
     ret_value->ref_type = H5R_OBJECT;
@@ -264,8 +264,8 @@ H5R_create_region(H5G_loc_t *loc, const char *name, hid_t dxpl_id, H5S_t *space)
     hbool_t obj_found = FALSE;  /* Object location found */
     hssize_t buf_size;          /* Size of buffer needed to serialize selection */
     uint8_t *p;                 /* Pointer to OID to store */
-    struct href_t *ref = NULL;         /* Reference to be returned */
-    struct href_t *ret_value = NULL;   /* Return value */
+    struct href *ref = NULL;         /* Reference to be returned */
+    struct href *ret_value = NULL;   /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
@@ -292,7 +292,7 @@ H5R_create_region(H5G_loc_t *loc, const char *name, hid_t dxpl_id, H5S_t *space)
 
     /* Allocate the space to store the serialized information */
     H5_CHECK_OVERFLOW(buf_size, hssize_t, size_t);
-    if(NULL == (ref = (struct href_t *)H5MM_malloc(sizeof(struct href_t))))
+    if(NULL == (ref = (struct href *)H5MM_malloc(sizeof(struct href))))
         HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, NULL, "Cannot allocate memory for reference")
     if(NULL == (ref->ref.serial.buf = H5MM_malloc((size_t) buf_size)))
         HGOTO_ERROR(H5E_REFERENCE, H5E_CANTALLOC, NULL, "Cannot allocate buffer to serialize selection")
@@ -341,8 +341,8 @@ H5R_create_attr(H5G_loc_t *loc, const char *name, hid_t dxpl_id, const char *att
     size_t buf_size;            /* Size of buffer needed to serialize attribute */
     size_t attr_name_len;       /* Length of the attribute name */
     uint8_t *p;                 /* Pointer to OID to store */
-    struct href_t *ref = NULL;         /* Reference to be returned */
-    struct href_t *ret_value = NULL;   /* Return value */
+    struct href *ref = NULL;         /* Reference to be returned */
+    struct href *ret_value = NULL;   /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
@@ -369,7 +369,7 @@ H5R_create_attr(H5G_loc_t *loc, const char *name, hid_t dxpl_id, const char *att
     buf_size = attr_name_len + sizeof(uint16_t) + sizeof(haddr_t);
 
     /* Allocate the space to store the serialized information */
-    if(NULL == (ref = (struct href_t *)H5MM_malloc(sizeof(struct href_t))))
+    if(NULL == (ref = (struct href *)H5MM_malloc(sizeof(struct href))))
         HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, NULL, "Cannot allocate memory for reference")
     if (NULL == (ref->ref.serial.buf = H5MM_malloc(buf_size)))
         HGOTO_ERROR(H5E_REFERENCE, H5E_CANTALLOC, NULL, "Cannot allocate buffer to serialize selection")
@@ -420,8 +420,8 @@ H5R_create_ext_object(const char *filename, const char *pathname)
     size_t pathname_len;        /* Length of the obj path name */
     size_t buf_size;            /* Size of buffer needed to serialize reference */
     uint8_t *p;                 /* Pointer to OID to store */
-    struct href_t *ref = NULL;         /* Reference to be returned */
-    struct href_t *ret_value = NULL;   /* Return value */
+    struct href *ref = NULL;         /* Reference to be returned */
+    struct href *ret_value = NULL;   /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
@@ -437,7 +437,7 @@ H5R_create_ext_object(const char *filename, const char *pathname)
     /* Compute buffer size, allow for the file name and object path name lengths */
     buf_size = filename_len + pathname_len + 2 * sizeof(uint16_t);
 
-    if(NULL == (ref = (struct href_t *)H5MM_malloc(sizeof(struct href_t))))
+    if(NULL == (ref = (struct href *)H5MM_malloc(sizeof(struct href))))
         HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, NULL, "Cannot allocate memory for reference")
     if (NULL == (ref->ref.serial.buf = H5MM_malloc(buf_size)))
         HGOTO_ERROR(H5E_REFERENCE, H5E_CANTALLOC, NULL, "Cannot allocate buffer to serialize selection")
@@ -492,8 +492,8 @@ H5R_create_ext_region(const char *filename, const char *pathname, H5S_t *space)
     size_t buf_size;            /* Size of buffer needed to serialize selection */
     size_t space_buf_size;      /* Size of buffer needed to serialize selection */
     uint8_t *p = NULL;          /* Pointer to OID to store */
-    struct href_t *ref = NULL;         /* Reference to be returned */
-    struct href_t *ret_value = NULL;   /* Return value */
+    struct href *ref = NULL;         /* Reference to be returned */
+    struct href *ret_value = NULL;   /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
@@ -515,7 +515,7 @@ H5R_create_ext_region(const char *filename, const char *pathname, H5S_t *space)
     buf_size = space_buf_size + filename_len + pathname_len + 2 * sizeof(uint16_t);
 
     /* Allocate the space to store the serialized information */
-    if(NULL == (ref = (struct href_t *)H5MM_malloc(sizeof(struct href_t))))
+    if(NULL == (ref = (struct href *)H5MM_malloc(sizeof(struct href))))
         HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, NULL, "Cannot allocate memory for reference")
     if (NULL == (ref->ref.serial.buf = H5MM_malloc((size_t) buf_size)))
         HGOTO_ERROR(H5E_REFERENCE, H5E_CANTALLOC, NULL, "Cannot allocate buffer to serialize selection")
@@ -574,8 +574,8 @@ H5R_create_ext_attr(const char *filename, const char *pathname, const char *attr
     size_t attr_name_len;       /* Length of the attribute name */
     size_t buf_size;            /* Size of buffer needed to serialize reference */
     uint8_t *p;                 /* Pointer to OID to store */
-    struct href_t *ref = NULL;         /* Reference to be returned */
-    struct href_t *ret_value = NULL;   /* Return value */
+    struct href *ref = NULL;         /* Reference to be returned */
+    struct href *ret_value = NULL;   /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
 
@@ -598,7 +598,7 @@ H5R_create_ext_attr(const char *filename, const char *pathname, const char *attr
     buf_size = filename_len + pathname_len + attr_name_len + 3 * sizeof(uint16_t);
 
     /* Allocate the space to store the serialized information */
-    if(NULL == (ref = (struct href_t *)H5MM_malloc(sizeof(struct href_t))))
+    if(NULL == (ref = (struct href *)H5MM_malloc(sizeof(struct href))))
         HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, NULL, "Cannot allocate memory for reference")
     if (NULL == (ref->ref.serial.buf = H5MM_malloc(buf_size)))
         HGOTO_ERROR(H5E_REFERENCE, H5E_CANTALLOC, NULL, "Cannot allocate buffer to serialize selection")
@@ -893,7 +893,7 @@ done:
 herr_t
 H5R_destroy(href_t _ref)
 {
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     herr_t    ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT_NOERR
@@ -947,7 +947,7 @@ done:
 H5R_type_t
 H5R_get_type(href_t _ref)
 {
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     H5R_type_t ret_value = H5R_BADTYPE;
 
     FUNC_ENTER_NOAPI_NOINIT_NOERR
@@ -1000,8 +1000,8 @@ done:
 static htri_t
 H5R__equal(href_t _ref1, href_t _ref2)
 {
-    struct href_t *ref1 = (struct href_t *) _ref1; /* Reference */
-    struct href_t *ref2 = (struct href_t *) _ref2; /* Reference */
+    struct href *ref1 = (struct href *) _ref1; /* Reference */
+    struct href *ref2 = (struct href *) _ref2; /* Reference */
     htri_t ret_value = FAIL;
 
     FUNC_ENTER_NOAPI_NOINIT
@@ -1088,7 +1088,7 @@ H5R__get_object(H5F_t *file, hid_t oapl_id, hid_t dxpl_id, href_t _ref, hbool_t 
     H5O_type_t obj_type;            /* Type of object */
     hbool_t ext_ref = FALSE;        /* External reference */
     const uint8_t *p = NULL;        /* Pointer to OID to store */
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     hid_t ret_value = H5I_BADID;    /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
@@ -1266,7 +1266,7 @@ H5Rget_object(hid_t obj_id, hid_t oapl_id, href_t _ref)
     H5I_type_t opened_type;
     void *opened_obj = NULL;
     H5VL_loc_params_t loc_params;
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     hid_t ret_value = FAIL;
 
     FUNC_ENTER_API(FAIL)
@@ -1317,7 +1317,7 @@ H5S_t *
 H5R__get_region(H5F_t *file, hid_t dxpl_id, href_t _ref)
 {
     const uint8_t *p = NULL;    /* Pointer to OID to store */
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     H5S_t *ret_value = NULL;
 
     FUNC_ENTER_NOAPI_NOINIT
@@ -1389,7 +1389,7 @@ H5Rget_region2(hid_t loc_id, href_t _ref)
 {
     H5VL_object_t    *obj = NULL;        /* object token of loc_id */
     H5VL_loc_params_t loc_params;
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     hid_t ret_value;
 
     FUNC_ENTER_API(FAIL)
@@ -1437,7 +1437,7 @@ H5R__get_attr(H5F_t *file, hid_t dxpl_id, href_t _ref)
     size_t attr_name_len;           /* Length of the attribute name */
     char *attr_name = NULL;         /* Attribute name */
     const uint8_t *p = NULL;        /* Pointer to OID to store */
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     H5A_t *ret_value = NULL;        /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
@@ -1535,7 +1535,7 @@ H5Rget_attr(hid_t loc_id, href_t _ref)
     H5I_type_t opened_type;
     void *opened_obj = NULL;
     H5VL_loc_params_t loc_params;
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     hid_t ret_value = FAIL;
 
     FUNC_ENTER_API(FAIL)
@@ -1589,7 +1589,7 @@ H5R__get_obj_type(H5F_t *file, hid_t dxpl_id, href_t _ref, H5O_type_t *obj_type)
     unsigned rc;                    /* Reference count of object */
     hbool_t ext_ref = FALSE;        /* External reference */
     const uint8_t *p = NULL;        /* Pointer to OID to store */
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     herr_t ret_value = SUCCEED;     /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
@@ -1705,7 +1705,7 @@ H5Rget_obj_type3(hid_t loc_id, href_t _ref, H5O_type_t *obj_type)
 {
     H5VL_object_t    *obj = NULL;        /* object token of loc_id */
     H5VL_loc_params_t loc_params;
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
@@ -1752,7 +1752,7 @@ H5R__get_obj_name(H5F_t *f, hid_t lapl_id, hid_t dxpl_id, href_t _ref,
     ssize_t ret_value = -1;     /* Return value */
     hbool_t ext_ref = FALSE;    /* External reference */
     const uint8_t *p = NULL;    /* Pointer to reference to decode */
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
 
     FUNC_ENTER_NOAPI_NOINIT
 
@@ -1863,7 +1863,7 @@ H5Rget_obj_name(hid_t loc_id, href_t _ref, char *name, size_t size)
 {
     H5VL_object_t    *obj = NULL; /* Object token of loc_id */
     H5VL_loc_params_t loc_params;
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     ssize_t ret_value;  /* Return value */
 
     FUNC_ENTER_API(FAIL)
@@ -1908,7 +1908,7 @@ H5R__get_attr_name(H5F_t *f, href_t _ref, char *name, size_t size)
     const uint8_t *p = NULL;    /* Pointer to reference to decode */
     size_t attr_name_len;       /* Length of the attribute name */
     size_t copy_len;
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
 
     FUNC_ENTER_NOAPI_NOINIT_NOERR
 
@@ -1979,7 +1979,7 @@ H5Rget_attr_name(hid_t loc_id, href_t _ref, char *name, size_t size)
 {
     H5VL_object_t    *obj = NULL; /* Object token of loc_id */
     H5VL_loc_params_t loc_params;
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     ssize_t ret_value;  /* Return value */
 
     FUNC_ENTER_API(FAIL)
@@ -2021,7 +2021,7 @@ done:
 static ssize_t
 H5R__get_file_name(href_t _ref, char *name, size_t size)
 {
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     ssize_t ret_value = -1;     /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
@@ -2079,7 +2079,7 @@ done:
 ssize_t
 H5Rget_file_name(href_t _ref, char *name, size_t size)
 {
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     ssize_t ret_value;  /* Return value */
 
     FUNC_ENTER_API(FAIL)
