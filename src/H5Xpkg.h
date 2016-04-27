@@ -41,6 +41,11 @@ H5_DLLVAR const H5X_class_t H5X_ALACRITY[1];
 H5_DLLVAR const H5X_class_t H5X_FASTBIT[1];
 #endif
 
+/*
+ * Dummy plugin meta
+ */
+H5_DLLVAR const H5X_class_t H5X_META_DUMMY[1];
+
 #ifdef H5_HAVE_EFF
 /*
  * Dummy plugin
@@ -52,6 +57,5 @@ H5_DLLVAR const H5X_class_t H5X_DUMMY_FF[1];
  */
 H5_DLLVAR const H5X_class_t H5X_META_DUMMY_FF[1];
 #endif
-
 
 #endif /* _H5Xpkg_H */
