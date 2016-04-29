@@ -3386,7 +3386,7 @@ done:
  *-------------------------------------------------------------------------
  */
 herr_t
-H5O_visit(H5G_loc_t *loc, const char *obj_name, H5_index_t idx_type,
+H5O_visit(const H5G_loc_t *loc, const char *obj_name, H5_index_t idx_type,
     H5_iter_order_t order, H5O_iterate_t op, void *op_data, hid_t lapl_id,
     hid_t dxpl_id)
 {

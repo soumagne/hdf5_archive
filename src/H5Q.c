@@ -155,7 +155,7 @@ static herr_t H5Q__apply_attr_name(const H5Q_t *query, hbool_t *result,
 static herr_t H5Q__apply_link_name(const H5Q_t *query, hbool_t *result,
     const char *name);
 
-static herr_t H5Q__apply_index(hid_t loc_id, const H5Q_t *query,
+static herr_t H5Q__apply_index(H5F_t *file, const H5Q_t *query,
     H5Q_view_t *view, unsigned *result);
 static herr_t H5Q__apply_iterate(hid_t oid, const char *name,
     const H5O_info_t *oinfo, void *udata);
@@ -1797,7 +1797,7 @@ H5Q_apply(const H5G_loc_t *loc, const H5Q_t *query, unsigned *result,
     H5G_t *ret_grp = NULL; /* New group created */
     H5P_genclass_t *pclass = NULL;
     unsigned flags;
-    hid_t file_id = FAIL, fapl_id = FAIL;
+    hid_t fapl_id = FAIL;
     H5F_t *file = NULL, *new_file = NULL;
     H5G_loc_t file_loc;
     H5X_class_t *idx_class = NULL;
@@ -1812,11 +1812,7 @@ H5Q_apply(const H5G_loc_t *loc, const H5Q_t *query, unsigned *result,
     /* First check and optimize query */
     /* TODO */
 
-    if (FAIL == (file_id = H5I_get_file_id(loc_id, FALSE)))
-        HGOTO_ERROR(H5E_INDEX, H5E_CANTGET, NULL, "can't get file ID from location");
-    if (NULL == (file = H5I_object_verify(file_id, H5I_FILE)))
-        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, NULL, "not a file");
-    if (FAIL == H5F_get_index(file, &idx_class, NULL, NULL))
+    if (FAIL == H5F_get_index(loc->oloc->file, &idx_class, NULL, NULL))
         HGOTO_ERROR(H5E_FILE, H5E_CANTGET, NULL, "can't get file index");
     if (FAIL == H5Q_get_type(query, &query_type))
         HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, NULL, "unable to get query type");
@@ -1824,7 +1820,7 @@ H5Q_apply(const H5G_loc_t *loc, const H5Q_t *query, unsigned *result,
     /* Use metadata index if available instead of visiting all objects */
     /* TODO for now only use index if query is combined with metadata queries */
     if (idx_class && (query_type != H5Q_TYPE_DATA_ELEM)) {
-        if (FAIL == H5Q__apply_index(loc_id, query, &view, result))
+        if (FAIL == H5Q__apply_index(file, query, &view, result))
             HGOTO_ERROR(H5E_INDEX, H5E_CANTCOMPARE, NULL, "unable to use metadata index");
     } else {
         H5Q_apply_arg_t args;
@@ -1920,19 +1916,15 @@ done:
  *-------------------------------------------------------------------------
  */
 static herr_t
-H5Q__apply_index(hid_t loc_id, const H5Q_t *query, H5Q_view_t *view,
+H5Q__apply_index(H5F_t *file, const H5Q_t *query, H5Q_view_t *view,
     unsigned *result)
 {
-    H5F_t *file = NULL;
     hid_t xapl_id = H5P_INDEX_ACCESS_DEFAULT;
     hid_t xxpl_id = H5P_INDEX_XFER_DEFAULT;
     H5Q_type_t query_type;
     herr_t ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_NOAPI_NOINIT
-
-    if (NULL == (file = H5I_object_verify(loc_id, H5I_FILE)))
-        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "loc_id is restricted to dataset");
 
     if (FAIL == H5Q_get_type(query, &query_type))
         HGOTO_ERROR(H5E_QUERY, H5E_CANTGET, FAIL, "unable to get query type");
@@ -2052,9 +2044,9 @@ H5Q__apply_index(hid_t loc_id, const H5Q_t *query, H5Q_view_t *view,
             H5Q_view_t view1 = H5Q_VIEW_INITIALIZER(view1), view2 = H5Q_VIEW_INITIALIZER(view2);
             unsigned result1 = 0, result2 = 0;
 
-            if (FAIL == H5Q__apply_index(loc_id, query->query.combine.l_query, &view1, &result1))
+            if (FAIL == H5Q__apply_index(file, query->query.combine.l_query, &view1, &result1))
                 HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
-            if (FAIL == H5Q__apply_index(loc_id, query->query.combine.r_query, &view2, &result2))
+            if (FAIL == H5Q__apply_index(file, query->query.combine.r_query, &view2, &result2))
                 HGOTO_ERROR(H5E_QUERY, H5E_CANTCOMPARE, FAIL, "unable to apply query");
 
             if (FAIL == H5Q__view_combine(op_type, &view1, &view2, result1, result2,
