@@ -2211,6 +2211,7 @@ H5F_get_index(H5F_t *file, H5X_class_t **idx_class, void **idx_handle,
     FUNC_ENTER_NOAPI_NOINIT_NOERR
 
     HDassert(file);
+    HDassert(file->shared);
 
     /* Get user data for index */
     if (idx_class) *idx_class = file->shared->idx_class;
@@ -2244,7 +2245,7 @@ H5F_open_index(H5F_t *file, hid_t xapl_id)
 
     HDassert(file);
 
-    file_id = file->file_id;
+    file_id = H5F_get_id(file, FALSE);
     idx_class = file->shared->idx_class;
     metadata_size = file->shared->idx_info.metadata_size;
     metadata = file->shared->idx_info.metadata;
