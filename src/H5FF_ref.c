@@ -412,7 +412,7 @@ H5Rget_object_ff(hid_t loc_id, hid_t H5_ATTR_UNUSED oapl_id, href_t _ref,
     const uint8_t *p;
     char *pathname = NULL;
     H5VL_object_t *obj = NULL;
-    struct href_t *ref = (struct href_t *) _ref; /* Reference */
+    struct href *ref = (struct href *) _ref; /* Reference */
     hid_t ret_value;              /* Return value */
 
     FUNC_ENTER_API(FAIL)
