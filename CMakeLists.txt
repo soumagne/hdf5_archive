@@ -637,6 +637,16 @@ if (H5_HAVE_PARALLEL)
   endif (MPI_C_LINK_FLAGS)
 endif (H5_HAVE_PARALLEL)
 
+#-----------------------------------------------------------------------------
+# Find DAOS
+#-----------------------------------------------------------------------------
+find_package (DAOS REQUIRED)
+if (DAOS_FOUND)
+  include_directories (${DAOS_INCLUDE_DIRS})
+  set (LINK_LIBS ${LINK_LIBS} ${DAOS_LIBRARIES})
+  set (LINK_SHARED_LIBS ${LINK_SHARED_LIBS} ${DAOS_LIBRARIES})
+endif (DAOS_FOUND)
+
 set (DEFAULT_API_VERSION "v110")
 #-----------------------------------------------------------------------------
 # Option to use 1.6.x API

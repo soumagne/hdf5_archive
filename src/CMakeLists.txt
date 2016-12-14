@@ -635,6 +635,19 @@ SET (H5VL_HDRS
 )
 IDE_GENERATED_PROPERTIES ("H5VL" "${H5VL_HDRS}" "${H5VL_SRCS}" )
 
+SET (H5VLDAOS_SRCS
+    ${HDF5_SRC_DIR}/H5FF.c
+    ${HDF5_SRC_DIR}/H5TR.c
+    ${HDF5_SRC_DIR}/H5VLdaosm.c
+)
+SET (H5VLDAOS_HDRS
+    ${HDF5_SRC_DIR}/H5ESpublic.h
+    ${HDF5_SRC_DIR}/H5FFpublic.h
+    ${HDF5_SRC_DIR}/H5TRpublic.h
+    ${HDF5_SRC_DIR}/H5VLdaosm_public.h
+)
+IDE_GENERATED_PROPERTIES ("H5VLDAOS" "${H5VLDAOS_HDRS}" "${H5VLDAOS_SRCS}" )
+
 set (H5WB_SRCS
     ${HDF5_SRC_DIR}/H5WB.c
 )
@@ -706,6 +719,7 @@ set (common_SRCS
     ${H5TS_SRCS}
     ${H5VM_SRCS}
     ${H5VL_SRCS}
+    ${H5VLDAOS_SRCS}
     ${H5WB_SRCS}
     ${H5Z_SRCS}
 )
@@ -741,6 +755,7 @@ set (H5_PUBLIC_HEADERS
     ${H5SM_HDRS}
     ${H5T_HDRS}
     ${H5VL_HDRS}
+    ${H5VLDAOS_HDRS}
     ${H5Z_HDRS}
 )
 
@@ -763,6 +778,7 @@ set (H5_PRIVATE_HEADERS
     ${HDF5_SRC_DIR}/H5MFprivate.h
     ${HDF5_SRC_DIR}/H5MMprivate.h
     ${HDF5_SRC_DIR}/H5Cprivate.h
+    ${HDF5_SRC_DIR}/H5FFprivate.h
     ${HDF5_SRC_DIR}/H5FSprivate.h
     ${HDF5_SRC_DIR}/H5Gprivate.h
     ${HDF5_SRC_DIR}/H5HFprivate.h
@@ -783,6 +799,7 @@ set (H5_PRIVATE_HEADERS
     ${HDF5_SRC_DIR}/H5Sprivate.h
     ${HDF5_SRC_DIR}/H5STprivate.h
     ${HDF5_SRC_DIR}/H5Tprivate.h
+    ${HDF5_SRC_DIR}/H5TRprivate.h
     ${HDF5_SRC_DIR}/H5TSprivate.h
     ${HDF5_SRC_DIR}/H5VMprivate.h
     ${HDF5_SRC_DIR}/H5VLprivate.h
