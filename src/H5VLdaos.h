@@ -1,5 +1,6 @@
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * Copyright by The HDF Group.                                               *
+ * Copyright by the Board of Trustees of the University of Illinois.         *
  * All rights reserved.                                                      *
  *                                                                           *
  * This file is part of HDF5.  The full HDF5 copyright notice, including     *
@@ -13,22 +14,28 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 /*
- * Programmer:	Mohamad Chaarawi
- *              Ocotber 2015
- *
- * Purpose:	This file contains declarations which define macros for the
- *		H5TR package.  Including this header means that the source file
- *		is part of the H5TR package.
+ * Purpose:	The public header file for the DAOS-M VOL plugin.
  */
-#ifndef _H5TRmodule_H
-#define _H5TRmodule_H
+#ifndef H5VLdaos_H
+#define H5VLdaos_H
 
-/* Define the proper control macros for the generic FUNC_ENTER/LEAVE and error
- *      reporting macros.
- */
-#define H5TR_MODULE
-#define H5_MY_PKG       H5TR
-#define H5_MY_PKG_ERR   H5E_TRANS
-#define H5_MY_PKG_INIT  YES
+/* Public headers needed by this file */
+#include "H5public.h"
+#include "H5Ipublic.h"
 
-#endif /* _H5TRmodule_H */
+#define H5VL_DAOS (H5VL_daos_init())
+#define HDF5_VOL_DAOS_VERSION_1   1   /* Version number of DAOS VOL plugin */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+H5_DLL hid_t H5VL_daos_init(void);
+H5_DLL herr_t H5Pset_fapl_daos(hid_t fapl_id, MPI_Comm comm, MPI_Info info,
+    const char *pool_uuid, const char *pool_grp);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* H5VLdaos_H */

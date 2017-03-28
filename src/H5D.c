@@ -30,6 +30,7 @@
 #include "H5Iprivate.h"		/* IDs			  		*/
 #include "H5MMprivate.h"	/* Memory management			*/
 #include "H5VLprivate.h"	/* VOL plugins				*/
+#include "H5CXprivate.h" /* Contexts            */
 
 /****************/
 /* Local Macros */
@@ -99,15 +100,44 @@ H5FL_BLK_EXTERN(vlen_fl_buf);
  *
  *-------------------------------------------------------------------------
  */
+static herr_t
+H5D__vl_create(H5CX_req_t *req)
+{
+    H5VL_object_t *obj = req->info.dset_create.parent_obj;
+    H5VL_loc_params_t *loc_params = &req->info.dset_create.loc_params;
+    const char *name = req->info.dset_create.name;
+    hid_t dcpl_id = req->info.dset_create.dcpl_id;
+    hid_t dapl_id = req->info.dset_create.dapl_id;
+    hid_t dxpl_id = req->info.dset_create.dxpl_id;
+    void *vol_dset;
+    herr_t ret_value = SUCCEED;    /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    req->callback = NULL;
+
+    /* Create the dataset through the VOL */
+    if(NULL == (vol_dset = H5VL_dataset_create(obj->vol_obj, *loc_params,
+        obj->vol_info->vol_cls, name, dcpl_id, dapl_id, dxpl_id, &req->vol_req)))
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTINIT, FAIL, "unable to create dataset");
+    req->obj->vol_obj = vol_dset;
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+}
+
 hid_t
 H5Dcreate2(hid_t loc_id, const char *name, hid_t type_id, hid_t space_id,
     hid_t lcpl_id, hid_t dcpl_id, hid_t dapl_id)
 {
-    void *dset = NULL;                /* dset token from VOL plugin */
+    H5VL_object_t *dset = NULL;
+    void *vol_dset = NULL;            /* dset token from VOL plugin */
     H5VL_object_t *obj = NULL;        /* object token of loc_id */
     H5VL_loc_params_t loc_params;
     H5P_genplist_t *plist = NULL;     /* Property list pointer */
     hid_t dxpl_id = H5AC_ind_read_dxpl_id; /* dxpl used by library */
+    H5CX_req_t *req;
+    hid_t dset_id;
     hid_t ret_value = FAIL;           /* Return value */
 
     FUNC_ENTER_API(FAIL)
@@ -154,18 +184,78 @@ H5Dcreate2(hid_t loc_id, const char *name, hid_t type_id, hid_t space_id,
     loc_params.type = H5VL_OBJECT_BY_SELF;
     loc_params.obj_type = H5I_get_type(loc_id);
 
-    /* Create the dataset through the VOL */
-    if(NULL == (dset = H5VL_dataset_create(obj->vol_obj, loc_params, obj->vol_info->vol_cls, 
-                                           name, dcpl_id, dapl_id, dxpl_id, H5_REQUEST_NULL)))
-	HGOTO_ERROR(H5E_DATASET, H5E_CANTINIT, FAIL, "unable to create dataset")
+    if(obj->context) {
+        H5CX_req_t *req; /* Request */
 
-    /* Get an atom for the dataset */
-    if((ret_value = H5VL_register_id(H5I_DATASET, dset, obj->vol_info, TRUE)) < 0)
-	HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to atomize dataset handle")
+        /* Create request */
+        if(NULL == (req = H5CX_request_create(obj->context)))
+            HGOTO_ERROR(H5E_CONTEXT, H5E_CANTCREATE, FAIL, "cannot create request");
+        req->req_type = H5CX_DATASET_CREATE;
+
+        /* TODO check dependency */
+        if(obj->nreqs) {
+            /* Generate id */
+            if((dset_id = H5VL_register_id(H5I_DATASET, NULL, obj->vol_info, TRUE)) < 0)
+                HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to atomize dataset handle");
+
+            /* get the file object */
+            if(NULL == (dset = H5VL_get_object(dset_id)))
+                HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid file identifier");
+            dset->context = obj->context; /* Inherit context */
+            dset->parent_obj = obj;
+            dset->nreqs++;
+            dset->parent_obj->nreqs++;
+            req->obj = dset;
+            req->callback = H5D__vl_create;
+            req->info.dset_create.parent_obj = obj;
+            req->info.dset_create.loc_params = loc_params;
+            req->info.dset_create.name = HDstrdup(name);
+            req->info.dset_create.dcpl_id = dcpl_id;
+            req->info.dset_create.dapl_id = dapl_id;
+            req->info.dset_create.dxpl_id = dxpl_id;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_pending(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+        } else {
+            req->callback = NULL;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_processing(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+
+            /* Create the dataset through the VOL */
+            if(NULL == (vol_dset = H5VL_dataset_create(obj->vol_obj, loc_params, obj->vol_info->vol_cls,
+                name, dcpl_id, dapl_id, dxpl_id, &req->vol_req)))
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTINIT, FAIL, "unable to create dataset");
+
+            /* Get an atom for the dataset */
+            if((dset_id = H5VL_register_id(H5I_DATASET, vol_dset, obj->vol_info, TRUE)) < 0)
+                HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to atomize dataset handle")
+
+                /* get the file object */
+                if(NULL == (dset = H5VL_get_object(dset_id)))
+                    HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid file identifier");
+            dset->context = obj->context; /* Inherit context */
+            dset->nreqs++;
+            dset->parent_obj->nreqs++;
+        }
+    } else {
+        /* Create the dataset through the VOL */
+        if(NULL == (vol_dset = H5VL_dataset_create(obj->vol_obj, loc_params, obj->vol_info->vol_cls,
+            name, dcpl_id, dapl_id, dxpl_id, H5_REQUEST_NULL)))
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTINIT, FAIL, "unable to create dataset")
+
+         /* Get an atom for the dataset */
+         if((dset_id = H5VL_register_id(H5I_DATASET, vol_dset, obj->vol_info, TRUE)) < 0)
+          HGOTO_ERROR(H5E_ATOM, H5E_CANTREGISTER, FAIL, "unable to atomize dataset handle")
+    }
+
+    ret_value = dset_id;
 
 done:
-    if (ret_value < 0 && dset)
-        if(H5VL_dataset_close (dset, obj->vol_info->vol_cls, dxpl_id, H5_REQUEST_NULL) < 0)
+    if (ret_value < 0 && vol_dset)
+        if(H5VL_dataset_close (vol_dset, obj->vol_info->vol_cls, dxpl_id, H5_REQUEST_NULL) < 0)
             HDONE_ERROR(H5E_DATASET, H5E_CLOSEERROR, FAIL, "unable to release dataset")
     FUNC_LEAVE_API(ret_value)
 } /* end H5Dcreate2() */
@@ -973,6 +1063,39 @@ done:
  *
  *-------------------------------------------------------------------------
  */
+static herr_t
+H5D__free_dset(H5CX_req_t *req)
+{
+    H5VL_object_t *dset = req->obj;
+    herr_t ret_value = SUCCEED;    /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    /* free file */
+    if(H5VL_free_object(dset) < 0)
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTDEC, FAIL, "unable to free VOL object");
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+}
+
+static herr_t
+H5D__vl_close(H5CX_req_t *req)
+{
+    H5VL_object_t *dset = req->obj;
+    herr_t ret_value = SUCCEED;    /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    req->callback = H5D__free_dset;
+
+    /* Close the dataset through the VOL */
+    if((ret_value = H5VL_dataset_close(dset->vol_obj, dset->vol_info->vol_cls,
+        H5AC_ind_read_dxpl_id, &req->vol_req)) < 0)
+        HGOTO_ERROR(H5E_DATASET, H5E_CLOSEERROR, FAIL, "unable to close dataset");
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+}
+
 herr_t
 H5D_close_dataset(void *_dset)
 {
@@ -981,19 +1104,51 @@ H5D_close_dataset(void *_dset)
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    /* Close the dataset through the VOL */
-    if((ret_value = H5VL_dataset_close(dset->vol_obj, dset->vol_info->vol_cls, 
-                                       H5AC_ind_read_dxpl_id, H5_REQUEST_NULL)) < 0)
-	HGOTO_ERROR(H5E_DATASET, H5E_CLOSEERROR, FAIL, "unable to close dataset")
+    if(dset->context) {
+        H5CX_req_t *req; /* Request */
+
+        /* Create request */
+        if(NULL == (req = H5CX_request_create(dset->context)))
+            HGOTO_ERROR(H5E_CONTEXT, H5E_CANTCREATE, FAIL, "cannot create request");
+        req->req_type = H5CX_DATASET_CLOSE;
+        req->obj = dset;
+
+        /* TODO check dependency */
+        if(dset->nreqs) {
+            req->callback = H5D__vl_close;
+            dset->nreqs++;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_pending(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+        } else {
+            req->callback = H5D__free_dset;
+            dset->nreqs++;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_processing(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+
+            /* Close the dataset through the VOL */
+            if((ret_value = H5VL_dataset_close(dset->vol_obj, dset->vol_info->vol_cls,
+                H5AC_ind_read_dxpl_id, &req->vol_req)) < 0)
+                HGOTO_ERROR(H5E_DATASET, H5E_CLOSEERROR, FAIL, "unable to close dataset");
+        }
+    } else {
+        /* Close the dataset through the VOL */
+        if((ret_value = H5VL_dataset_close(dset->vol_obj, dset->vol_info->vol_cls,
+            H5AC_ind_read_dxpl_id, H5_REQUEST_NULL)) < 0)
+            HGOTO_ERROR(H5E_DATASET, H5E_CLOSEERROR, FAIL, "unable to close dataset");
+
+        /* MSC - Weird thing for datasets and filters:
+           Always decrement the ref count on the vol for datasets, since
+           the ID is removed even if the close fails */
+
+        /* free dset */
+        if(H5VL_free_object(dset) < 0)
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTDEC, FAIL, "unable to free VOL object")
+    }
 
 done:
-    /* MSC - Weird thing for datasets and filters:
-       Always decrement the ref count on the vol for datasets, since
-       the ID is removed even if the close fails */
-
-    /* free dset */
-    if(H5VL_free_object(dset) < 0)
-        HGOTO_ERROR(H5E_DATASET, H5E_CANTDEC, FAIL, "unable to free VOL object")
-
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5D_close_dataset() */

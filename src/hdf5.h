@@ -24,6 +24,7 @@
 #include "H5public.h"
 #include "H5Apublic.h"		/* Attributes				*/
 #include "H5ACpublic.h"		/* Metadata cache			*/
+#include <H5CXpublic.h>     /* Contexts             */
 #include "H5Dpublic.h"		/* Datasets				*/
 #include "H5Epublic.h"		/* Errors				*/
 #include "H5Fpublic.h"		/* Files				*/
@@ -43,8 +44,8 @@
 
 /* FastForward headers */
 #include "H5FFpublic.h"         /* FastForward wrappers                 */
-#include "H5TRpublic.h"         /* Transactions                         */
 #include "H5VLdaosm_public.h"   /* DAOS-M VOL plugin                    */
+#include "H5VLdaos.h"           /* DAOS VOL plugin                      */
 
 /* Predefined VOL plugins */
 #include "H5VLnative.h"		/* Native HDF5 plugin           	*/

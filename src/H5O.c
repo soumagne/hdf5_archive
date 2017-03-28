@@ -48,6 +48,7 @@
 #include "H5Opkg.h"             /* Object headers			*/
 #include "H5SMprivate.h"        /* Shared object header messages        */
 #include "H5VLprivate.h"	/* Virtual Object Layer                 */
+#include "H5CXprivate.h" /* Contexts            */
 
 /****************/
 /* Local Macros */

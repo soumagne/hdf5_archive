@@ -48,6 +48,7 @@
 #include "H5SLprivate.h"	/* Skip Lists                           */
 #include "H5Tprivate.h"		/* Datatypes				*/
 #include "H5VLprivate.h"	/* Virtual Object Layer                 */
+#include "H5CXprivate.h" /* Contexts            */
 
 /* Define this to compile in support for dumping ID information */
 /* #define H5I_DEBUG_OUTPUT */

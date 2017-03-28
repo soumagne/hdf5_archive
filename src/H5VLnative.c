@@ -188,10 +188,13 @@ static H5VL_class_t H5VL_native_g = {
         H5VL_native_object_specific,            /* specific */
         H5VL_native_object_optional             /* optional */
     },
-    {                                           /* async_cls */
-        NULL,                                   /* cancel */
-        NULL,                                   /* test */
-        NULL                                    /* wait */
+    {                                           /* context_cls */
+        NULL,                                   /* create */
+        NULL,                                   /* close */
+        NULL,                                   /* request_create */
+        NULL,                                   /* request_close */
+        NULL,                                   /* poll */
+        NULL                                    /* request_cancel */
     },
     NULL
 };

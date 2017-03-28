@@ -93,6 +93,7 @@
 #include "H5MMprivate.h"	/* Memory management			*/
 #include "H5Pprivate.h"         /* Property lists                       */
 #include "H5VLprivate.h"	/* VOL plugins				*/
+#include "H5CXprivate.h" /* Contexts            */
 
 /****************/
 /* Local Macros */

@@ -30,7 +30,6 @@
 #include "H5MMprivate.h"        /* Memory management                    */
 #include "H5Pprivate.h"         /* Property lists                       */
 #include "H5Sprivate.h"         /* Dataspaces                           */
-#include "H5TRprivate.h"        /* Transactions                         */
 #include "H5VLprivate.h"        /* VOL plugins                          */
 #include "H5VLdaosm.h"          /* DAOS-M plugin                        */
 
@@ -244,9 +243,12 @@ static H5VL_class_t H5VL_daosm_g = {
         NULL,//H5VL_iod_object_optional                /* optional */
     },
     {
-        NULL,//H5VL_iod_cancel,
-        NULL,//H5VL_iod_test,
-        NULL,//H5VL_iod_wait
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL
     },
     NULL
 };

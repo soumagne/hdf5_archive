@@ -21,6 +21,7 @@
 #define _H5VLprivate_H
 
 #include "H5VLpublic.h"
+#include "H5CXprivate.h"
 
 /**************************/
 /* Library Private Macros */
@@ -29,9 +30,6 @@
 /****************************/
 /* Library Private Typedefs */
 /****************************/
-
-#define H5_REQUEST_NULL NULL
-#define H5_EVENT_STACK_NULL ((hid_t)-1)
 
 /* Internal struct to track VOL information with objects */
 typedef struct H5VL_t {
@@ -44,6 +42,9 @@ typedef struct H5VL_t {
 typedef struct H5VL_object_t {
     void               *vol_obj;        /* pointer to object created by plugin */
     H5VL_t             *vol_info;       /* pointer to VOL info struct */
+    H5CX_t             *context;        /* context associated to object */
+    unsigned int        nreqs;
+    struct H5VL_object_t *parent_obj;
 } H5VL_object_t;
 
 /* Define structure to hold plugin ID & info for FAPLs */
@@ -134,9 +135,13 @@ H5_DLL herr_t H5VL_object_get(void *obj, H5VL_loc_params_t loc_params, const H5V
 H5_DLL herr_t H5VL_object_specific(void *obj, H5VL_loc_params_t loc_params, const H5VL_class_t *vol_cls, H5VL_object_specific_t specific_type, hid_t dxpl_id, void **req, ...);
 H5_DLL herr_t H5VL_object_optional(void *obj, const H5VL_class_t *vol_cls, hid_t dxpl_id, void **req, ...);
 
-H5_DLL herr_t H5VL_request_cancel(void **req, const H5VL_class_t *vol_cls, H5ES_status_t *status);
-H5_DLL herr_t H5VL_request_test(void **req, const H5VL_class_t *vol_cls, H5ES_status_t *status);
-H5_DLL herr_t H5VL_request_wait(void **req, const H5VL_class_t *vol_cls, H5ES_status_t *status);
+H5_DLL void *H5VL_context_create(const H5VL_class_t *vol_cls);
+H5_DLL herr_t H5VL_context_close(const H5VL_class_t *vol_cls, void *context);
+H5_DLL herr_t H5VL_context_set(H5VL_object_t *obj, H5CX_t *context);
+H5_DLL void *H5VL_request_create(const H5VL_class_t *vol_cls, void *context);
+H5_DLL herr_t H5VL_request_close(const H5VL_class_t *vol_cls, void *context, void *req);
+H5_DLL int H5VL_context_poll(const H5VL_class_t *vol_cls, void *context, unsigned int timeout, unsigned int max_reqs, void **reqs);
+H5_DLL herr_t H5VL_request_cancel(const H5VL_class_t *vol_cls, void *context, void *req);
 
 H5_DLL herr_t H5F_close_file(void *file);
 H5_DLL herr_t H5A_close_attr(void *attr);

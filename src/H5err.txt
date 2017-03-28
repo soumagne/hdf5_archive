@@ -78,6 +78,7 @@ MAJOR, H5E_SOHM, Shared Object Header Messages
 MAJOR, H5E_EARRAY, Extensible Array
 MAJOR, H5E_FARRAY, Fixed Array
 MAJOR, H5E_PLUGIN, Plugin for dynamically loaded library
+MAJOR, H5E_CONTEXT, Context
 MAJOR, H5E_NONE_MAJOR, No error
 
 # Sections (for grouping minor errors)
@@ -96,6 +97,7 @@ SECTION, TYPECONV, Datatype conversion errors
 SECTION, DSPACE, Dataspace errors
 SECTION, PLIST, Property list errors
 SECTION, MPI, Parallel MPI errors
+SECTION, CONTEXT, Context errors
 SECTION, HEAP, Heap errors
 SECTION, FSPACE, Free space errors
 SECTION, PIPELINE, I/O pipeline errors
@@ -237,6 +239,9 @@ MINOR, LINK, H5E_CANTSORT, Can't sort objects
 MINOR, MPI, H5E_MPI, Some MPI function failed
 MINOR, MPI, H5E_MPIERRSTR, MPI Error String
 MINOR, MPI, H5E_CANTRECV, Can't receive data
+
+# Context related errors
+MINOR, CONTEXT, H5E_CANTCANCEL, Unable to cancel operation
 
 # Heap errors
 MINOR, HEAP, H5E_CANTRESTORE, Can't restore condition

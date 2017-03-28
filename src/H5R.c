@@ -34,7 +34,7 @@
 #include "H5Rpkg.h"		/* References				*/
 #include "H5Sprivate.h"		/* Dataspaces 				*/
 #include "H5VLprivate.h"	/* VOL plugins				*/
-
+#include "H5CXprivate.h" /* Contexts            */
 
 /****************/
 /* Local Macros */

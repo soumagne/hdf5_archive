@@ -46,7 +46,7 @@
 #include "H5Rpkg.h"		/* References				*/
 #include "H5Ppublic.h"          /* for using H5P_DATASET_ACCESS_DEFAULT */
 #include "H5VLprivate.h"	/* VOL plugins				*/
-
+#include "H5CXprivate.h" /* Contexts            */
 
 /****************/
 /* Local Macros */

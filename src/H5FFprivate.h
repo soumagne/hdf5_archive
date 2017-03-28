@@ -23,7 +23,6 @@
 
 /* Private headers needed by this file */
 #include "H5private.h"          /* Generic Functions			*/
-#include "H5VLdaosm.h"          /* DAOS-M VOL plugin			*/
 
 /**************************/
 /* Library Private Macros */
@@ -50,9 +49,4 @@
 /* Library Private Prototypes */
 /******************************/
 
-#ifdef H5_HAVE_EFF
-
-#endif /* H5_HAVE_EFF */
-
 #endif /* _H5FFprivate_H */
-

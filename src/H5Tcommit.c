@@ -38,6 +38,7 @@
 #include "H5Pprivate.h"         /* Property lists                       */
 #include "H5Tpkg.h"		/* Datatypes				*/
 #include "H5VLprivate.h"	/* VOL plugins				*/
+#include "H5CXprivate.h" /* Contexts            */
 
 /****************/
 /* Local Macros */

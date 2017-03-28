@@ -30,6 +30,7 @@
 #include "H5MMprivate.h"	/* Memory management			*/
 #include "H5Pprivate.h"		/* Property lists			*/
 #include "H5VLprivate.h"	/* VOL plugins				*/
+#include "H5CXprivate.h" /* Contexts            */
 
 
 /****************/
@@ -761,6 +762,26 @@ done:
  *
  *-------------------------------------------------------------------------
  */
+static herr_t
+H5F__vl_flush(H5CX_req_t *req)
+{
+    H5VL_object_t *obj = req->obj;
+    H5I_type_t  obj_type = req->info.file_flush.obj_type;
+    H5F_scope_t scope = req->info.file_flush.scope;
+    herr_t ret_value = SUCCEED;    /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    req->callback = NULL;
+
+    if ((ret_value = H5VL_file_specific(obj->vol_obj, obj->vol_info->vol_cls,
+        H5VL_FILE_FLUSH, H5AC_ind_read_dxpl_id, &req->vol_req, obj_type, scope)) < 0)
+        HGOTO_ERROR(H5E_FILE, H5E_CANTFLUSH, FAIL, "unable to flush file");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+}
+
 herr_t
 H5Fflush(hid_t object_id, H5F_scope_t scope)
 {
@@ -773,17 +794,51 @@ H5Fflush(hid_t object_id, H5F_scope_t scope)
 
     obj_type = H5I_get_type(object_id);
     if(H5I_FILE != obj_type && H5I_GROUP != obj_type && H5I_DATATYPE != obj_type &&
-       H5I_DATASET != obj_type && H5I_ATTR != obj_type) {
-        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a file or file object")
+        H5I_DATASET != obj_type && H5I_ATTR != obj_type) {
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a file or file object");
     }
 
     /* get the file object */
     if(NULL == (obj = H5VL_get_object(object_id)))
-        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid file identifier")
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "invalid file identifier");
 
-    if(H5VL_file_specific(obj->vol_obj, obj->vol_info->vol_cls, H5VL_FILE_FLUSH, 
-                          H5AC_ind_read_dxpl_id, H5_REQUEST_NULL, obj_type, scope) < 0)
-        HGOTO_ERROR(H5E_FILE, H5E_CANTFLUSH, FAIL, "unable to flush file")
+    if(obj->context) {
+        H5CX_req_t *req; /* Request */
+
+        /* Create request */
+        if(NULL == (req = H5CX_request_create(obj->context)))
+            HGOTO_ERROR(H5E_CONTEXT, H5E_CANTCREATE, FAIL, "cannot create request");
+        req->req_type = H5CX_FILE_FLUSH;
+        req->obj = obj;
+
+        /* TODO check dependency */
+        if(obj->nreqs) {
+            req->callback = H5F__vl_flush;
+            req->info.file_flush.obj_type = obj_type;
+            req->info.file_flush.scope = scope;
+            obj->nreqs++;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_pending(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+        } else {
+            req->callback = NULL;
+            obj->nreqs++;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_processing(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+
+            if ((ret_value = H5VL_file_specific(obj->vol_obj, obj->vol_info->vol_cls,
+                H5VL_FILE_FLUSH, H5AC_ind_read_dxpl_id, &req->vol_req, obj_type, scope)) < 0)
+                HGOTO_ERROR(H5E_FILE, H5E_CANTFLUSH, FAIL, "unable to flush file");
+        }
+    } else {
+        if ((ret_value = H5VL_file_specific(obj->vol_obj, obj->vol_info->vol_cls,
+            H5VL_FILE_FLUSH, H5AC_ind_read_dxpl_id, NULL, H5_REQUEST_NULL,
+            obj_type, scope)) < 0)
+            HGOTO_ERROR(H5E_FILE, H5E_CANTFLUSH, FAIL, "unable to flush file");
+    }
 
 done:
     FUNC_LEAVE_API(ret_value)
@@ -846,6 +901,40 @@ done:
  *
  *-------------------------------------------------------------------------
  */
+static herr_t
+H5F__free_file(H5CX_req_t *req)
+{
+    H5VL_object_t *file = req->obj;
+    herr_t ret_value = SUCCEED;    /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    /* free file */
+    if(H5VL_free_object(file) < 0)
+        HGOTO_ERROR(H5E_FILE, H5E_CANTDEC, FAIL, "unable to free VOL object");
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+}
+
+static herr_t
+H5F__vl_close(H5CX_req_t *req)
+{
+    H5VL_object_t *file = req->obj;
+    herr_t ret_value = SUCCEED;    /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    req->callback = H5F__free_file;
+
+    /* Close the file through the VOL*/
+    if((ret_value = H5VL_file_close(file->vol_obj, file->vol_info->vol_cls,
+        H5AC_ind_read_dxpl_id, &req->vol_req)) < 0)
+        HGOTO_ERROR(H5E_FILE, H5E_CANTCLOSEFILE, FAIL, "unable to close file");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+}
+
 herr_t
 H5F_close_file(void *_file)
 {
@@ -854,14 +943,47 @@ H5F_close_file(void *_file)
 
     FUNC_ENTER_NOAPI_NOINIT
 
-    /* Close the file through the VOL*/
-    if((ret_value = H5VL_file_close(file->vol_obj, file->vol_info->vol_cls, 
-                                    H5AC_ind_read_dxpl_id, H5_REQUEST_NULL)) < 0)
-	HGOTO_ERROR(H5E_FILE, H5E_CANTCLOSEFILE, FAIL, "unable to close file")
+    if(file->context) {
+        H5CX_req_t *req; /* Request */
 
-    /* free file */
-    if(H5VL_free_object(file) < 0)
-        HGOTO_ERROR(H5E_FILE, H5E_CANTDEC, FAIL, "unable to free VOL object")
+        /* Create request */
+        if(NULL == (req = H5CX_request_create(file->context)))
+            HGOTO_ERROR(H5E_CONTEXT, H5E_CANTCREATE, FAIL, "cannot create request");
+        req->req_type = H5CX_FILE_CLOSE;
+        req->obj = file;
+
+        /* TODO check dependency */
+        if(file->nreqs) {
+            req->callback = H5F__vl_close;
+            file->nreqs++;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_pending(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+        } else {
+            req->callback = H5F__free_file;
+            file->nreqs++;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_processing(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+
+            /* Close the file through the VOL*/
+            if((ret_value = H5VL_file_close(file->vol_obj, file->vol_info->vol_cls,
+                H5AC_ind_read_dxpl_id, &req->vol_req)) < 0)
+                HGOTO_ERROR(H5E_FILE, H5E_CANTCLOSEFILE, FAIL, "unable to close file");
+        }
+    } else {
+        /* Close the file through the VOL*/
+        if((ret_value = H5VL_file_close(file->vol_obj, file->vol_info->vol_cls,
+            H5AC_ind_read_dxpl_id, NULL)) < 0)
+            HGOTO_ERROR(H5E_FILE, H5E_CANTCLOSEFILE, FAIL, "unable to close file");
+
+        /* free file */
+        if(H5VL_free_object(file) < 0)
+            HGOTO_ERROR(H5E_FILE, H5E_CANTDEC, FAIL, "unable to free VOL object");
+    }
+
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5F_close_file() */

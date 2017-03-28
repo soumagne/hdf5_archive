@@ -24,7 +24,7 @@
 
 #include "H5public.h"
 #include "H5Apublic.h"		/* Attributes				*/
-#include "H5ESpublic.h"         /* Event Stack                          */
+#include "H5CXpublic.h"         /* Context                              */
 #include "H5Fpublic.h"          /* Files                                */
 #include "H5Lpublic.h"          /* Links                                */
 #include "H5Opublic.h"          /* Objects                              */
@@ -258,8 +258,10 @@ typedef struct H5VL_datatype_class_t {
 typedef struct H5VL_file_class_t {
     void *(*create)(const char *name, unsigned flags, hid_t fcpl_id, 
                     hid_t fapl_id, hid_t dxpl_id, void **req);
-    void *(*open)(const char *name, unsigned flags, hid_t fapl_id, hid_t dxpl_id, void **req);
-    herr_t (*get)(void *obj, H5VL_file_get_t get_type, hid_t dxpl_id, void **req, va_list arguments);
+    void *(*open)(const char *name, unsigned flags, hid_t fapl_id,
+                  hid_t dxpl_id, void **req);
+    herr_t (*get)(void *obj, H5VL_file_get_t get_type, hid_t dxpl_id,
+                  void **req, va_list arguments);
     herr_t (*specific)(void *obj, H5VL_file_specific_t specific_type, 
                        hid_t dxpl_id, void **req, va_list arguments);
     herr_t (*optional)(void *obj, hid_t dxpl_id, void **req, va_list arguments);
@@ -310,17 +312,22 @@ typedef struct H5VL_object_class_t {
     herr_t (*optional)(void *obj, hid_t dxpl_id, void **req, va_list arguments);
 } H5VL_object_class_t;
 
-/* H5AO routines */
-typedef struct H5VL_async_class_t {
-    herr_t (*cancel)(void **, H5ES_status_t *);
-    herr_t (*test)  (void **, H5ES_status_t *);
-    herr_t (*wait)  (void **, H5ES_status_t *);
-} H5VL_async_class_t;
+/* H5CX routines */
+typedef struct H5VL_context_class_t {
+    void * (*create)(void);
+    herr_t (*close)(void *context);
+    void * (*req_create)(void *context);
+    herr_t (*req_close)(void *context, void *req);
+    int    (*poll)(void *context, unsigned int timeout,
+                   unsigned int max_reqs, void **reqs);
+    herr_t (*cancel)(void *context, void *req);
+} H5VL_context_class_t;
 
 /* enum value to identify the class of a VOL plugin (mostly for comparison purposes) */
 typedef enum H5VL_class_value_t {
     H5_VOL_NATIVE = 0, /* This should be first */
     H5_VOL_DAOSM = 1,
+    H5_VOL_DAOS = 2,
     H5_VOL_MAX_LIB_VALUE = 128 /* This should be last */
 } H5VL_class_value_t;
 
@@ -345,7 +352,7 @@ typedef struct H5VL_class_t {
     H5VL_object_class_t        object_cls;        /* object class callbacks */
 
     /* Services */
-    H5VL_async_class_t         async_cls;         /* asynchronous class callbacks */
+    H5VL_context_class_t       context_cls;       /* context class callbacks */
     herr_t (*optional)(void *obj, hid_t dxpl_id, void **req, va_list arguments); /* Optional callback */
 } H5VL_class_t;
 
@@ -411,9 +418,12 @@ H5_DLL herr_t H5VLobject_get(void *obj, H5VL_loc_params_t loc_params, hid_t plug
 H5_DLL herr_t H5VLobject_specific(void *obj, H5VL_loc_params_t loc_params, hid_t plugin_id, H5VL_object_specific_t specific_type, hid_t dxpl_id, void **req, va_list arguments);
 H5_DLL herr_t H5VLobject_optional(void *obj, hid_t plugin_id, hid_t dxpl_id, void **req, va_list arguments);
 
-H5_DLL herr_t H5VLrequest_cancel(void **req, hid_t plugin_id, H5ES_status_t *status);
-H5_DLL herr_t H5VLrequest_test(void **req, hid_t plugin_id, H5ES_status_t *status);
-H5_DLL herr_t H5VLrequest_wait(void **req, hid_t plugin_id, H5ES_status_t *status);
+H5_DLL void *H5VLcontext_create(hid_t plugin_id);
+H5_DLL herr_t H5VLcontext_close(hid_t plugin_id, void *context);
+H5_DLL void *H5VLrequest_create(hid_t plugin_id, void *context);
+H5_DLL herr_t H5VLrequest_close(hid_t plugin_id, void *context, void *req);
+H5_DLL int H5VLcontext_poll(hid_t plugin_id, void *context, unsigned int timeout, unsigned int max_reqs, void **reqs);
+H5_DLL herr_t H5VLrequest_cancel(hid_t plugin_id, void *context, void *req);
 
 /* Function prototypes */
 H5_DLL herr_t H5VLinitialize(hid_t plugin_id, hid_t vipl_id);

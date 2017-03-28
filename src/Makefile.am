@@ -47,6 +47,7 @@ libhdf5_la_SOURCES= H5.c H5checksum.c H5dbg.c H5system.c H5timer.c H5trace.c \
         H5B2.c H5B2cache.c H5B2dbg.c H5B2hdr.c H5B2int.c H5B2stat.c H5B2test.c \
         H5C.c \
         H5CS.c \
+        H5CX.c \
         H5D.c H5Dbtree.c H5Dbtree2.c H5Dchunk.c H5Dcompact.c H5Dcontig.c H5Ddbg.c \
         H5Ddeprec.c H5Dearray.c H5Defl.c H5Dfarray.c H5Dfill.c H5Dint.c \
         H5Dio.c H5Dlayout.c \
@@ -61,7 +62,7 @@ libhdf5_la_SOURCES= H5.c H5checksum.c H5dbg.c H5system.c H5timer.c H5trace.c \
         H5FA.c H5FAcache.c H5FAdbg.c H5FAdblock.c H5FAdblkpage.c H5FAhdr.c \
         H5FAstat.c H5FAtest.c \
         H5VL.c H5VLint.c H5VLnative.c \
-        H5VLdaosm.c \
+        H5VLdaosm.c H5VLdaos.c \
         H5FD.c H5FDcore.c  \
         H5FDfamily.c H5FDint.c H5FDlog.c \
         H5FDmulti.c H5FDsec2.c H5FDspace.c H5FDstdio.c \
@@ -111,7 +112,7 @@ libhdf5_la_SOURCES= H5.c H5checksum.c H5dbg.c H5system.c H5timer.c H5trace.c \
         H5Tfloat.c H5Tinit.c H5Tnative.c H5Toffset.c H5Toh.c \
         H5Topaque.c \
         H5Torder.c \
-        H5Tpad.c H5Tprecis.c H5Tstrpad.c H5Tvisit.c H5Tvlen.c H5TR.c H5TS.c H5VM.c H5WB.c H5Z.c  \
+        H5Tpad.c H5Tprecis.c H5Tstrpad.c H5Tvisit.c H5Tvlen.c H5TS.c H5VM.c H5WB.c H5Z.c  \
         H5Zdeflate.c H5Zfletcher32.c H5Znbit.c H5Zshuffle.c \
         H5Zscaleoffset.c H5Zszip.c H5Ztrans.c
 
@@ -128,19 +129,19 @@ endif
 # Public headers
 include_HEADERS = hdf5.h H5api_adpt.h H5overflow.h H5pubconf.h H5public.h H5version.h \
         H5Apublic.h H5ACpublic.h \
-        H5Cpublic.h H5Dpublic.h \
-        H5Epubgen.h H5Epublic.h H5ESpublic.h H5Fpublic.h \
+        H5Cpublic.h H5CXpublic.h H5Dpublic.h \
+        H5Epubgen.h H5Epublic.h H5Fpublic.h \
         H5FDpublic.h H5FDcore.h H5FDdirect.h \
         H5FDfamily.h H5FDlog.h H5FDmpi.h H5FDmpio.h \
         H5FDmulti.h H5FDsec2.h  H5FDstdio.h \
         H5FFpublic.h \
         H5VLpublic.h H5VLnative.h \
-        H5VLdaosm_public.h \
+        H5VLdaosm_public.h H5VLdaos.h \
         H5Gpublic.h  H5Ipublic.h H5Lpublic.h \
         H5MMpublic.h H5Opublic.h H5Ppublic.h \
         H5PLextern.h H5PLpublic.h \
         H5Rpublic.h H5Spublic.h \
-        H5Tpublic.h H5TRpublic.h H5Zpublic.h
+        H5Tpublic.h H5Zpublic.h
 
 # install libhdf5.settings in lib directory
 settingsdir=$(libdir)

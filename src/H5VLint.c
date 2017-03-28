@@ -155,7 +155,8 @@ H5VL_register_id(H5I_type_t type, void *object, H5VL_t *vol_plugin, hbool_t app_
     FUNC_ENTER_NOAPI(FAIL)
 
     /* Check arguments */
-    HDassert(object);
+    /* TODO commented out to allow for VL object placeholder when using async */
+    /* HDassert(object); */
     HDassert(vol_plugin);
 
     /* setup VOL object */
@@ -2103,92 +2104,173 @@ done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5VL_object_optional() */
 
-
 /*-------------------------------------------------------------------------
- * Function:	H5VL_request_cancel
+ * Function:    H5VL_context_create
  *
- * Purpose:	Cancels a request through the VOL
+ * Purpose:
  *
- * Return:	Success:	Non Negative
- *		Failure:	Negative
- *
- * Programmer:	Mohamad Chaarawi
- *              March, 2013
+ * Return:
  *
  *-------------------------------------------------------------------------
  */
-herr_t
-H5VL_request_cancel(void **req, const H5VL_class_t *vol_cls, H5ES_status_t *status)
+void *
+H5VL_context_create(const H5VL_class_t *vol_cls)
 {
-    herr_t              ret_value = SUCCEED;
+    void *ret_value = NULL;
 
-    FUNC_ENTER_NOAPI(FAIL)
+    FUNC_ENTER_NOAPI(NULL)
 
-    if(NULL == vol_cls->async_cls.cancel)
-	HGOTO_ERROR(H5E_VOL, H5E_UNSUPPORTED, FAIL, "vol plugin has no `async cancel' method");
-    if((ret_value = (vol_cls->async_cls.cancel)(req, status)) < 0)
-        HGOTO_ERROR(H5E_VOL, H5E_CANTRELEASE, FAIL, "request cancel failed")
+    if(NULL != vol_cls->context_cls.create
+        && (NULL == (ret_value = (vol_cls->context_cls.create)())))
+        HGOTO_ERROR(H5E_VOL, H5E_CANTCREATE, NULL, "context create failed");
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5VL_request_cancel() */
+} /* end H5VL_context_create() */
 
-
 /*-------------------------------------------------------------------------
- * Function:	H5VL_request_test
+ * Function:    H5VL_context_close
  *
- * Purpose:	Tests a request through the VOL
+ * Purpose:
  *
- * Return:	Success:	Non Negative
- *		Failure:	Negative
- *
- * Programmer:	Mohamad Chaarawi
- *              March, 2013
+ * Return:
  *
  *-------------------------------------------------------------------------
  */
 herr_t
-H5VL_request_test(void **req, const H5VL_class_t *vol_cls, H5ES_status_t *status)
+H5VL_context_close(const H5VL_class_t *vol_cls, void *context)
 {
-    herr_t              ret_value = SUCCEED;
+    herr_t ret_value = FAIL;
 
     FUNC_ENTER_NOAPI(FAIL)
 
-    if(NULL == vol_cls->async_cls.test)
-	HGOTO_ERROR(H5E_VOL, H5E_UNSUPPORTED, FAIL, "vol plugin has no `async test' method");
-    if((ret_value = (vol_cls->async_cls.test)(req, status)) < 0)
-        HGOTO_ERROR(H5E_VOL, H5E_CANTRELEASE, FAIL, "request test failed")
+    if(NULL != vol_cls->context_cls.close
+        && (FAIL == (ret_value = (vol_cls->context_cls.close)(context))))
+        HGOTO_ERROR(H5E_VOL, H5E_CANTCLOSEOBJ, FAIL, "context close failed");
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5VL_request_test() */
+} /* end H5VL_context_close() */
 
-
 /*-------------------------------------------------------------------------
- * Function:	H5VL_request_wait
+ * Function:    H5VL_context_set
  *
- * Purpose:	Waits a request through the VOL
+ * Purpose:
  *
- * Return:	Success:	Non Negative
- *		Failure:	Negative
- *
- * Programmer:	Mohamad Chaarawi
- *              March, 2013
+ * Return:
  *
  *-------------------------------------------------------------------------
  */
 herr_t
-H5VL_request_wait(void **req, const H5VL_class_t *vol_cls, H5ES_status_t *status)
+H5VL_context_set(H5VL_object_t *obj, H5CX_t *context)
 {
-    herr_t              ret_value = SUCCEED;
+    herr_t ret_value = FAIL;
 
     FUNC_ENTER_NOAPI(FAIL)
 
-    if(NULL == vol_cls->async_cls.wait)
-	HGOTO_ERROR(H5E_VOL, H5E_UNSUPPORTED, FAIL, "vol plugin has no `async wait' method");
-    if((ret_value = (vol_cls->async_cls.wait)(req, status)) < 0)
+    HDassert(obj);
+
+    obj->context = context;
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5VL_context_set() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5VL_request_create
+ *
+ * Purpose:
+ *
+ * Return:
+ *
+ *-------------------------------------------------------------------------
+ */
+void *
+H5VL_request_create(const H5VL_class_t *vol_cls, void *context)
+{
+    void *ret_value = NULL;
+
+    FUNC_ENTER_NOAPI(NULL)
+
+    if(NULL != vol_cls->context_cls.req_create
+        && (NULL == (ret_value = (vol_cls->context_cls.req_create)(context))))
+        HGOTO_ERROR(H5E_VOL, H5E_CANTCREATE, NULL, "request create failed");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5VL_request_create() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5VL_request_close
+ *
+ * Purpose:
+ *
+ * Return:
+ *
+ *-------------------------------------------------------------------------
+ */
+herr_t
+H5VL_request_close(const H5VL_class_t *vol_cls, void *context, void *req)
+{
+    herr_t ret_value = FAIL;
+
+    FUNC_ENTER_NOAPI(FAIL)
+
+    if(NULL != vol_cls->context_cls.req_close
+        && (FAIL == (ret_value = (vol_cls->context_cls.req_close)(context, req))))
+        HGOTO_ERROR(H5E_VOL, H5E_CANTCLOSEOBJ, FAIL, "request close failed");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5VL_request_close() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5VL_context_poll
+ *
+ * Purpose:
+ *
+ * Return:
+ *
+ *-------------------------------------------------------------------------
+ */
+int
+H5VL_context_poll(const H5VL_class_t *vol_cls, void *context,
+    unsigned int timeout, unsigned int max_reqs, void **reqs)
+{
+    int ret_value = -1;
+
+    FUNC_ENTER_NOAPI(FAIL)
+
+    if(NULL == vol_cls->context_cls.poll)
+        HGOTO_ERROR(H5E_VOL, H5E_UNSUPPORTED, FAIL, "vol plugin has no `context poll' method");
+    if((ret_value = (vol_cls->context_cls.poll)(context, timeout, max_reqs, reqs)) < 0)
         HGOTO_ERROR(H5E_VOL, H5E_CANTRELEASE, FAIL, "request wait failed")
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5VL_request_wait() */
+} /* end H5VL_context_poll() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5VL_request_cancel
+ *
+ * Purpose:
+ *
+ * Return:
+ *
+ *-------------------------------------------------------------------------
+ */
+herr_t
+H5VL_request_cancel(const H5VL_class_t *vol_cls, void *context, void *req)
+{
+    herr_t ret_value = SUCCEED;
+
+    FUNC_ENTER_NOAPI(FAIL)
+
+    if(NULL == vol_cls->context_cls.cancel)
+	HGOTO_ERROR(H5E_VOL, H5E_UNSUPPORTED, FAIL, "vol plugin has no `context cancel' method");
+    if((ret_value = (vol_cls->context_cls.cancel)(context, req)) < 0)
+        HGOTO_ERROR(H5E_VOL, H5E_CANTCANCEL, FAIL, "request cancel failed")
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5VL_request_cancel() */

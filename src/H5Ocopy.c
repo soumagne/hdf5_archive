@@ -47,6 +47,7 @@
 #include "H5Opkg.h"             /* Object headers			*/
 #include "H5Pprivate.h"         /* Property lists                       */
 #include "H5VLprivate.h"	/* VOL          		  	*/
+#include "H5CXprivate.h" /* Contexts            */
 
 /****************/
 /* Local Macros */

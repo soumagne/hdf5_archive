@@ -1,6 +1,5 @@
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * Copyright by The HDF Group.                                               *
- * Copyright by the Board of Trustees of the University of Illinois.         *
  * All rights reserved.                                                      *
  *                                                                           *
  * This file is part of HDF5.  The full HDF5 copyright notice, including     *
@@ -14,27 +13,19 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 /*
- * Programmer:  Mohamad Chaarawi <chaarawi@hdfgroup.org>
- *              July 24, 2014
+ * Purpose:	This file contains declarations which define macros for the
+ *		H5CX package.  Including this header means that the source file
+ *		is part of the H5CX package.
  */
-#ifndef _H5ESpublic_H
-#define _H5ESpublic_H
+#ifndef _H5CXmodule_H
+#define _H5CXmodule_H
 
-/* Asynchronous operation status */
-typedef enum H5ES_status_t {
-    H5ES_STATUS_IN_PROGRESS,   /* Operation has not yet completed */
-    H5ES_STATUS_SUCCEED,       /* Operation has completed, successfully */
-    H5ES_STATUS_FAIL,          /* Operation has completed, but failed */
-    H5ES_STATUS_CANCEL         /* Operation has not completed and has been cancelled */
-} H5ES_status_t;
+/* Define the proper control macros for the generic FUNC_ENTER/LEAVE and error
+ *      reporting macros.
+ */
+#define H5CX_MODULE
+#define H5_MY_PKG       H5CX
+#define H5_MY_PKG_ERR   H5E_CONTEXT
+#define H5_MY_PKG_INIT  YES
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* _H5ESpublic_H */
+#endif /* _H5CXmodule_H */

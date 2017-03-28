@@ -48,7 +48,6 @@ $Source = "";
                "H5E_direction_t"            => "Ed",
                "H5E_error_t"                => "Ee",
 	       "H5E_type_t"                 => "Et",
-	       "H5ES_status_t"              => "Es",
 	       "H5F_close_degree_t"         => "Fd",
 	       "H5F_file_space_type_t"      => "Ff",
 	       "H5F_mem_t"                  => "Fm",

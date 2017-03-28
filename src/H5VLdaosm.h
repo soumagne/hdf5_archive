@@ -22,24 +22,16 @@
 #ifndef H5VLdaosm_H
 #define H5VLdaosm_H
 
-#define H5_HAVE_EFF 1 /* DSMINC */
-
 /* Include package's public header */
 #include "H5VLdaosm_public.h"
-
-#ifdef H5_HAVE_EFF
 
 #include "daos.h"
 
 #define HDF5_VOL_DAOSM_VERSION_1	1	/* Version number of IOD VOL plugin */
 
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#ifdef H5_HAVE_EFF
 
 /* FAPL property to tell the VOL plugin to open a saved snapshot when opening a
  * file */
@@ -117,8 +109,6 @@ typedef struct H5VL_daosm_link_val_t {
 extern hid_t H5VL_DAOSM_g;
 
 H5_DLL herr_t H5VL_daosm_init(void);
-
-#endif /* H5_HAVE_EFF */
 
 #ifdef __cplusplus
 }

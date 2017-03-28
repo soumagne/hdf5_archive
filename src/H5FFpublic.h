@@ -32,10 +32,6 @@
 extern "C" {
 #endif
 
-#define H5_HAVE_EFF 1 /* DSMINC */
-
-#ifdef H5_HAVE_EFF
-
 /*******************/
 /* Public Typedefs */
 /*******************/
@@ -50,27 +46,7 @@ extern "C" {
 
 /* API wrappers */
 H5_DLL hid_t H5Fcreate_ff(const char *filename, unsigned flags, hid_t fcpl_id,
-    hid_t fapl_id, hid_t *trans_id/*out*/);
-H5_DLL hid_t H5Fopen_ff(const char *filename, unsigned flags, hid_t fapl_id,
-    hid_t *trans_id/*out*/);
-H5_DLL herr_t H5Fclose_ff(hid_t file_id, hid_t trans_id);
-H5_DLL hid_t H5Gcreate_ff(hid_t loc_id, const char *name, hid_t lcpl_id,
-    hid_t gcpl_id, hid_t gapl_id, hid_t trans_id);
-H5_DLL hid_t H5Gopen_ff(hid_t loc_id, const char *name, hid_t gapl_id,
-    hid_t trans_id);
-H5_DLL herr_t H5Gclose_ff(hid_t group_id, hid_t trans_id);
-H5_DLL hid_t H5Dcreate_ff(hid_t loc_id, const char *name, hid_t type_id,
-    hid_t space_id, hid_t lcpl_id, hid_t dcpl_id, hid_t dapl_id,
-    hid_t trans_id);
-H5_DLL hid_t H5Dopen_ff(hid_t loc_id, const char *name, hid_t dapl_id,
-    hid_t trans_id);
-H5_DLL herr_t H5Dwrite_ff(hid_t dset_id, hid_t mem_type_id, hid_t mem_space_id,
-    hid_t file_space_id, hid_t dxpl_id, const void *buf, hid_t trans_id);
-H5_DLL herr_t H5Dread_ff(hid_t dset_id, hid_t mem_type_id, hid_t mem_space_id,
-    hid_t file_space_id, hid_t dxpl_id, void *buf/*out*/, hid_t trans_id);
-H5_DLL herr_t H5Dclose_ff(hid_t dset_id, hid_t trans_id);
-
-#endif /* H5_HAVE_EFF */
+    hid_t fapl_id, hid_t context_id);
 
 #ifdef __cplusplus
 }

@@ -2414,101 +2414,179 @@ done:
     FUNC_LEAVE_API(ret_value)
 } /* end H5VLobject_optional() */
 
-
 /*-------------------------------------------------------------------------
- * Function:	H5VLrequest_cancel
+ * Function:    H5VLcontext_create
  *
- * Purpose:	Cancels a request through the VOL
+ * Purpose:
  *
- * Return:	Success:	Non Negative
- *		Failure:	Negative
+ * Return:
  *
- * Programmer:	Mohamad Chaarawi
- *              March, 2013
+ *-------------------------------------------------------------------------
+ */
+void *
+H5VLcontext_create(hid_t plugin_id)
+{
+    H5VL_class_t *vol_cls = NULL;
+    void *ret_value = NULL;
+
+    FUNC_ENTER_API(NULL)
+
+    if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(plugin_id, H5I_VOL)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a VOL plugin ID");
+
+    if((ret_value = H5VL_context_create(vol_cls)) < 0)
+        HGOTO_ERROR(H5E_VOL, H5E_CANTCREATE, NULL, "unable to create context");
+
+done:
+    FUNC_LEAVE_API(ret_value)
+} /* end H5VLcontext_create() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5VLcontext_close
+ *
+ * Purpose:
+ *
+ * Return:
  *
  *-------------------------------------------------------------------------
  */
 herr_t
-H5VLrequest_cancel(void **req, hid_t plugin_id, H5ES_status_t *status)
+H5VLcontext_close(hid_t plugin_id, void *context)
 {
     H5VL_class_t *vol_cls = NULL;
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_API(FAIL)
-    H5TRACE3("e", "**xi*Es", req, plugin_id, status);
 
     if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(plugin_id, H5I_VOL)))
-        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a VOL plugin ID")
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a VOL plugin ID");
 
-    if((ret_value = H5VL_request_cancel(req, vol_cls, status)) < 0)
-	HGOTO_ERROR(H5E_VOL, H5E_CANTRELEASE, FAIL, "unable to cancel request")
+    if((ret_value = H5VL_context_close(vol_cls, context)) < 0)
+        HGOTO_ERROR(H5E_VOL, H5E_CANTCLOSEOBJ, FAIL, "unable to close context");
+
+done:
+    FUNC_LEAVE_API(ret_value)
+} /* end H5VLcontext_close() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5VLrequest_create
+ *
+ * Purpose:
+ *
+ * Return:
+ *
+ *-------------------------------------------------------------------------
+ */
+void *
+H5VLrequest_create(hid_t plugin_id, void *context)
+{
+    H5VL_class_t *vol_cls = NULL;
+    void *ret_value = NULL;
+
+    FUNC_ENTER_API(NULL)
+
+    if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(plugin_id, H5I_VOL)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, NULL, "not a VOL plugin ID");
+    if (NULL == context)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, NULL, "invalid context");
+
+    if((ret_value = H5VL_request_create(vol_cls, context)) < 0)
+        HGOTO_ERROR(H5E_VOL, H5E_CANTCREATE, NULL, "unable to create request");
+
+done:
+    FUNC_LEAVE_API(ret_value)
+} /* end H5VLrequest_create() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5VLrequest_close
+ *
+ * Purpose:
+ *
+ * Return:
+ *
+ *-------------------------------------------------------------------------
+ */
+herr_t
+H5VLrequest_close(hid_t plugin_id, void *context, void *req)
+{
+    H5VL_class_t *vol_cls = NULL;
+    herr_t ret_value = SUCCEED;
+
+    FUNC_ENTER_API(FAIL)
+
+    if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(plugin_id, H5I_VOL)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a VOL plugin ID");
+    if (NULL == context)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid context");
+    if (NULL == req)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid request");
+
+    if((ret_value = H5VL_request_close(vol_cls, context, req)) < 0)
+        HGOTO_ERROR(H5E_VOL, H5E_CANTCLOSEOBJ, FAIL, "unable to close request");
+
+done:
+    FUNC_LEAVE_API(ret_value)
+} /* end H5VLrequest_close() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5VLcontext_poll
+ *
+ * Purpose:
+ *
+ * Return:
+ *
+ *-------------------------------------------------------------------------
+ */
+herr_t
+H5VLcontext_poll(hid_t plugin_id, void *context, unsigned int timeout,
+    unsigned int max_reqs, void **reqs)
+{
+    H5VL_class_t *vol_cls = NULL;
+    int ret_value = SUCCEED;
+
+    FUNC_ENTER_API(FAIL)
+
+    if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(plugin_id, H5I_VOL)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a VOL plugin ID");
+    if (NULL == context)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid context");
+    if (NULL == reqs)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid request array");
+
+    if((ret_value = H5VL_context_poll(vol_cls, context, timeout, max_reqs, reqs)) < 0)
+        HGOTO_ERROR(H5E_VOL, H5E_CANTOPERATE, FAIL, "unable to poll context");
+
+done:
+    FUNC_LEAVE_API(ret_value)
+} /* end H5VLcontext_poll() */
+
+/*-------------------------------------------------------------------------
+ * Function:    H5VLrequest_cancel
+ *
+ * Purpose:
+ *
+ * Return:
+ *
+ *-------------------------------------------------------------------------
+ */
+herr_t
+H5VLrequest_cancel(hid_t plugin_id, void *context, void *req)
+{
+    H5VL_class_t *vol_cls = NULL;
+    herr_t ret_value = SUCCEED;
+
+    FUNC_ENTER_API(FAIL)
+
+    if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(plugin_id, H5I_VOL)))
+        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a VOL plugin ID");
+    if (NULL == context)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid context");
+    if (NULL == req)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid request");
+
+    if((ret_value = H5VL_request_cancel(vol_cls, context, req)) < 0)
+        HGOTO_ERROR(H5E_VOL, H5E_CANTCANCEL, FAIL, "unable to cancel request");
 
 done:
     FUNC_LEAVE_API(ret_value)
 } /* end H5VLrequest_cancel() */
-
-
-/*-------------------------------------------------------------------------
- * Function:	H5VLrequest_test
- *
- * Purpose:	Tests a request through the VOL
- *
- * Return:	Success:	Non Negative
- *		Failure:	Negative
- *
- * Programmer:	Mohamad Chaarawi
- *              March, 2013
- *
- *-------------------------------------------------------------------------
- */
-herr_t
-H5VLrequest_test(void **req, hid_t plugin_id, H5ES_status_t *status)
-{
-    H5VL_class_t *vol_cls = NULL;
-    herr_t ret_value = SUCCEED;
-
-    FUNC_ENTER_API(FAIL)
-    H5TRACE3("e", "**xi*Es", req, plugin_id, status);
-
-    if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(plugin_id, H5I_VOL)))
-        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a VOL plugin ID")
-
-    if((ret_value = H5VL_request_test(req, vol_cls, status)) < 0)
-	HGOTO_ERROR(H5E_VOL, H5E_CANTRELEASE, FAIL, "unable to test request")
-
-done:
-    FUNC_LEAVE_API(ret_value)
-} /* end H5VLrequest_test() */
-
-
-/*-------------------------------------------------------------------------
- * Function:	H5VLrequest_wait
- *
- * Purpose:	Waits on a request through the VOL
- *
- * Return:	Success:	Non Negative
- *		Failure:	Negative
- *
- * Programmer:	Mohamad Chaarawi
- *              March, 2013
- *
- *-------------------------------------------------------------------------
- */
-herr_t
-H5VLrequest_wait(void **req, hid_t plugin_id, H5ES_status_t *status)
-{
-    H5VL_class_t *vol_cls = NULL;
-    herr_t ret_value = SUCCEED;
-
-    FUNC_ENTER_API(FAIL)
-    H5TRACE3("e", "**xi*Es", req, plugin_id, status);
-
-    if(NULL == (vol_cls = (H5VL_class_t *)H5I_object_verify(plugin_id, H5I_VOL)))
-        HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not a VOL plugin ID")
-
-    if((ret_value = H5VL_request_wait(req, vol_cls, status)) < 0)
-	HGOTO_ERROR(H5E_VOL, H5E_CANTRELEASE, FAIL, "unable to wait on request")
-
-done:
-    FUNC_LEAVE_API(ret_value)
-} /* end H5VLrequest_wait() */

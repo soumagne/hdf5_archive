@@ -837,37 +837,6 @@ H5_trace(const double *returning, const char *func, const char *type, ...)
                         } /* end else */
                         break;
 
-                    case 's':
-                        if(ptr) {
-                            if(vp)
-                                fprintf(out, "0x%lx", (unsigned long)vp);
-                            else
-                                fprintf(out, "NULL");
-                        } /* end if */
-                        else {
-                            H5ES_status_t status = (H5ES_status_t)va_arg(ap, int);
-
-                            switch(status) {
-                                case H5ES_STATUS_IN_PROGRESS:
-                                    fprintf(out, "H5ES_STATUS_IN_PROGRESS");
-                                    break;
-                                case H5ES_STATUS_SUCCEED:
-                                    fprintf(out, "H5ES_STATUS_SUCCEED");
-                                    break;
-                                case H5ES_STATUS_FAIL:
-                                    fprintf(out, "H5ES_STATUS_FAIL");
-                                    break;
-                                case H5ES_STATUS_CANCEL:
-                                    fprintf(out, "H5ES_STATUS_CANCEL");
-                                    break;
-
-                                default:
-                                    fprintf(out, "%ld", (long)status);
-                                    break;
-                            } /* end switch */
-                        } /* end else */
-                        break;
-
                     default:
                         fprintf(out, "BADTYPE(E%c)", type[1]);
                         goto error;

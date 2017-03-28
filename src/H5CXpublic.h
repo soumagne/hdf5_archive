@@ -14,10 +14,10 @@
 
 /*
  * This file contains function prototypes for each exported function in the
- * H5TR module.
+ * H5CX module.
  */
-#ifndef _H5TRpublic_H
-#define _H5TRpublic_H
+#ifndef _H5CXpublic_H
+#define _H5CXpublic_H
 
 /* System headers needed by this file */
 
@@ -28,7 +28,6 @@
 /*****************/
 /* Public Macros */
 /*****************/
-#define H5TR_START_NUM_PEERS_NAME "number_of_peers_name"
 
 /*******************/
 /* Public Typedefs */
@@ -38,28 +37,22 @@
 /* Public Variables */
 /********************/
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#ifdef H5_HAVE_EFF
 
 /*********************/
 /* Public Prototypes */
 /*********************/
 
 /* API wrappers */
-H5_DLL hid_t H5TRcreate(hid_t obj_id, uint64_t trans_num);
-H5_DLL herr_t H5TRget_trans_num(hid_t trans_id, uint64_t *trans_num);
-H5_DLL herr_t H5TRcommit(hid_t trans_id);
-//H5_DLL herr_t H5TRskip(hid_t file_id, uint64_t start_trans_num, uint64_t count, hid_t estack_id);
-//H5_DLL herr_t H5TRabort(hid_t trans_id, hid_t estack_id);
-H5_DLL herr_t H5TRclose(hid_t trans_id);
-
-#endif /* H5_HAVE_EFF */
+H5_DLL hid_t  H5CXcreate(void /* Property list eventually */);
+H5_DLL herr_t H5CXclose(hid_t context_id);
+H5_DLL herr_t H5CXwait(hid_t context_id, unsigned int timeout, hbool_t *flag);
+H5_DLL herr_t H5CXcancel(hid_t context_id);
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* _H5TRpublic_H */
+
+#endif /* _H5CXpublic_H */

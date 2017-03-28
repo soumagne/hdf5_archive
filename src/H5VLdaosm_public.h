@@ -22,8 +22,6 @@
 #ifndef H5VLdaosm_public_H
 #define H5VLdaosm_public_H
 
-#define H5_HAVE_EFF 1 /* DSMINC */
-
 /* System headers needed by this file */
 #include <uuid/uuid.h>
 
@@ -34,8 +32,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#ifdef H5_HAVE_EFF
 
 #define H5VL_DAOSM_SNAP_ID_INVAL (uint64_t)(int64_t)-1
 
@@ -49,10 +45,6 @@ H5_DLL herr_t H5VLdaosm_snap_create(hid_t loc_id,
     H5VL_daosm_snap_id_t *snap_id);
 H5_DLL herr_t H5Pset_daosm_snap_open(hid_t fapl_id,
     H5VL_daosm_snap_id_t snap_id);
-//H5_DLL herr_t EFF_init(void); DSMINC
-//H5_DLL herr_t EFF_finalize(void); DSMINC
-
-#endif /* H5_HAVE_EFF */
 
 #ifdef __cplusplus
 }

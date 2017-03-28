@@ -55,6 +55,7 @@
 
 /* Includes needed to handle DAOS-M driver */
 #include "H5VLdaosm.h"          /* DAOS-M VOL plugin */
+#include "H5VLdaos.h"           /* DAOS VOL plugin */
 
 #ifdef H5_HAVE_WINDOWS
 #include "H5FDwindows.h"        /* Windows buffered I/O                 */

@@ -26,6 +26,7 @@
 #include "H5Pprivate.h"		/* Property lists			*/
 #include "H5MMprivate.h"	/* Memory management			*/
 #include "H5VLprivate.h"	/* VOL          			*/
+#include "H5CXprivate.h" /* Contexts            */
 
 /* PRIVATE PROTOTYPES */
 static void H5F_mount_count_ids_recurse(H5F_t *f, unsigned *nopen_files, unsigned *nopen_objs);

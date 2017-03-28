@@ -35,6 +35,7 @@
 #include "H5Oprivate.h"         /* File objects                         */
 #include "H5Pprivate.h"         /* Property lists                       */
 #include "H5VLprivate.h"	/* Virtual Object Layer                 */
+#include "H5CXprivate.h" /* Contexts            */
 
 /****************/
 /* Local Macros */

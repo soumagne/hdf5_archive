@@ -31,6 +31,7 @@
 #include "H5MMprivate.h"        /* Memory management                    */
 #include "H5Sprivate.h"		/* Dataspace			  	*/
 #include "H5VLprivate.h"	/* VOL plugins				*/
+#include "H5CXprivate.h" /* Contexts            */
 
 #ifdef H5_HAVE_PARALLEL
 /* Remove this if H5R_DATASET_REGION is no longer used in this file */
@@ -116,6 +117,30 @@ H5FL_BLK_DEFINE(type_conv);
  *
  *-------------------------------------------------------------------------
  */
+static herr_t
+H5D__vl_read(H5CX_req_t *req)
+{
+    H5VL_object_t *dset = req->obj;
+    hid_t mem_type_id = req->info.dset_read.mem_type_id;
+    hid_t mem_space_id = req->info.dset_read.mem_space_id;
+    hid_t file_space_id = req->info.dset_read.file_space_id;
+    hid_t plist_id = req->info.dset_read.plist_id;
+    void *buf = req->info.dset_read.buf;
+    herr_t ret_value = SUCCEED;    /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    req->callback = NULL;
+
+    /* Read the data through the VOL */
+    if((ret_value = H5VL_dataset_read(dset->vol_obj, dset->vol_info->vol_cls, mem_type_id, mem_space_id,
+        file_space_id, plist_id, buf, &req->vol_req)) < 0)
+        HGOTO_ERROR(H5E_DATASET, H5E_READERROR, FAIL, "can't read data");
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+}
+
 herr_t
 H5Dread(hid_t dset_id, hid_t mem_type_id, hid_t mem_space_id,
 	hid_t file_space_id, hid_t plist_id, void *buf/*out*/)
@@ -159,10 +184,46 @@ H5Dread(hid_t dset_id, hid_t mem_type_id, hid_t mem_space_id,
         if(TRUE != H5P_isa_class(plist_id, H5P_DATASET_XFER))
             HGOTO_ERROR(H5E_ARGS, H5E_BADTYPE, FAIL, "not xfer parms")
 
-    /* Read the data through the VOL */
-    if((ret_value = H5VL_dataset_read(dset->vol_obj, dset->vol_info->vol_cls, mem_type_id, mem_space_id, 
-                                      file_space_id, plist_id, buf, H5_REQUEST_NULL)) < 0)
-	HGOTO_ERROR(H5E_DATASET, H5E_READERROR, FAIL, "can't read data")
+    if(dset->context) {
+        H5CX_req_t *req; /* Request */
+
+        /* Create request */
+        if(NULL == (req = H5CX_request_create(dset->context)))
+            HGOTO_ERROR(H5E_CONTEXT, H5E_CANTCREATE, FAIL, "cannot create request");
+        req->req_type = H5CX_DATASET_READ;
+        req->obj = dset;
+
+        if(dset->nreqs) {
+            req->callback = H5D__vl_read;
+            req->info.dset_read.mem_type_id = mem_type_id;
+            req->info.dset_read.mem_space_id = mem_space_id;
+            req->info.dset_read.file_space_id = file_space_id;
+            req->info.dset_read.plist_id = plist_id;
+            req->info.dset_read.buf = buf;
+            dset->nreqs++;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_pending(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+        } else {
+            req->callback = NULL;
+            dset->nreqs++;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_processing(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+
+            /* Read the data through the VOL */
+            if((ret_value = H5VL_dataset_read(dset->vol_obj, dset->vol_info->vol_cls, mem_type_id, mem_space_id,
+                file_space_id, plist_id, buf, &req->vol_req)) < 0)
+                HGOTO_ERROR(H5E_DATASET, H5E_READERROR, FAIL, "can't read data");
+        }
+    } else {
+        /* Read the data through the VOL */
+        if((ret_value = H5VL_dataset_read(dset->vol_obj, dset->vol_info->vol_cls, mem_type_id, mem_space_id,
+            file_space_id, plist_id, buf, H5_REQUEST_NULL)) < 0)
+            HGOTO_ERROR(H5E_DATASET, H5E_READERROR, FAIL, "can't read data");
+    }
 
 done:
     FUNC_LEAVE_API(ret_value)
@@ -200,6 +261,30 @@ done:
  *
  *-------------------------------------------------------------------------
  */
+static herr_t
+H5D__vl_write(H5CX_req_t *req)
+{
+    H5VL_object_t *dset = req->obj;
+    hid_t mem_type_id = req->info.dset_write.mem_type_id;
+    hid_t mem_space_id = req->info.dset_write.mem_space_id;
+    hid_t file_space_id = req->info.dset_write.file_space_id;
+    hid_t dxpl_id = req->info.dset_write.dxpl_id;
+    const void *buf = req->info.dset_write.buf;
+    herr_t ret_value = SUCCEED;    /* Return value */
+
+    FUNC_ENTER_NOAPI_NOINIT
+
+    req->callback = NULL;
+
+    /* Write the data through the VOL */
+    if((ret_value = H5VL_dataset_write(dset->vol_obj, dset->vol_info->vol_cls, mem_type_id, mem_space_id,
+        file_space_id, dxpl_id, buf, &req->vol_req)) < 0)
+        HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "can't write data")
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
+}
+
 herr_t
 H5Dwrite(hid_t dset_id, hid_t mem_type_id, hid_t mem_space_id,
 	 hid_t file_space_id, hid_t dxpl_id, const void *buf)
@@ -257,10 +342,46 @@ H5Dwrite(hid_t dset_id, hid_t mem_type_id, hid_t mem_space_id,
 	} /* end if */
     }
 
-    /* Write the data through the VOL */
-    if((ret_value = H5VL_dataset_write(dset->vol_obj, dset->vol_info->vol_cls, mem_type_id, mem_space_id, 
-                                       file_space_id, dxpl_id, buf, H5_REQUEST_NULL)) < 0)
-	HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "can't write data")
+    if(dset->context) {
+        H5CX_req_t *req; /* Request */
+
+        /* Create request */
+        if(NULL == (req = H5CX_request_create(dset->context)))
+            HGOTO_ERROR(H5E_CONTEXT, H5E_CANTCREATE, FAIL, "cannot create request");
+        req->req_type = H5CX_DATASET_WRITE;
+        req->obj = dset;
+
+        if(dset->nreqs) {
+            req->callback = H5D__vl_write;
+            req->info.dset_write.mem_type_id = mem_type_id;
+            req->info.dset_write.mem_space_id = mem_space_id;
+            req->info.dset_write.file_space_id = file_space_id;
+            req->info.dset_write.dxpl_id = dxpl_id;
+            req->info.dset_write.buf = buf;
+            dset->nreqs++;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_pending(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+        } else {
+            req->callback = NULL;
+            dset->nreqs++;
+
+            /* Add request to context */
+            if(FAIL == H5CX_request_insert_processing(req->context, req))
+                HGOTO_ERROR(H5E_CONTEXT, H5E_CANTINSERT, FAIL, "cannot insert request");
+
+            /* Write the data through the VOL */
+            if((ret_value = H5VL_dataset_write(dset->vol_obj, dset->vol_info->vol_cls, mem_type_id, mem_space_id,
+                file_space_id, dxpl_id, buf, &req->vol_req)) < 0)
+                HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "can't write data")
+        }
+    } else {
+        /* Write the data through the VOL */
+        if((ret_value = H5VL_dataset_write(dset->vol_obj, dset->vol_info->vol_cls, mem_type_id, mem_space_id,
+            file_space_id, dxpl_id, buf, H5_REQUEST_NULL)) < 0)
+            HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "can't write data")
+    }
 
 done:
     FUNC_LEAVE_API(ret_value)

@@ -278,8 +278,6 @@
 
 #endif /* H5_HAVE_MPE */
 
-#define H5_HAVE_EFF 1 //DSMINC
-
 /*
  * dmalloc (debugging malloc) support
  */
@@ -2542,6 +2540,7 @@ H5_DLL void H5_term_library(void);
 H5_DLL int H5A_term_package(void);
 H5_DLL int H5A_top_term_package(void);
 H5_DLL int H5AC_term_package(void);
+H5_DLL int H5CX_term_package(void);
 H5_DLL int H5D_term_package(void);
 H5_DLL int H5D_top_term_package(void);
 H5_DLL int H5E_term_package(void);
@@ -2564,8 +2563,6 @@ H5_DLL int H5T_term_package(void);
 H5_DLL int H5T_top_term_package(void);
 H5_DLL int H5VL_term_package(void);
 H5_DLL int H5Z_term_package(void);
-
-H5_DLL int H5TR_term_package(void);
 
 /* Checksum functions */
 H5_DLL uint32_t H5_checksum_fletcher32(const void *data, size_t len);
