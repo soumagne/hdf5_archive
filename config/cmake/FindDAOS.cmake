@@ -5,16 +5,16 @@
 #  DAOS_LIBRARIES - The libraries needed to use DAOS
 
 find_path(DAOS_INCLUDE_DIR daos.h
-  HINTS /usr/local/include /usr/include /opt/daosm/default/include)
+  HINTS /usr/local/include /usr/include /opt/daos/default/include)
 
 find_library(DAOS_LIBRARY NAMES daos
-  HINTS /usr/local/lib /usr/lib /opt/daosm/default/lib)
+  HINTS /usr/local/lib /usr/lib /opt/daos/default/lib)
 
 find_library(DAOS_COMMON_LIBRARY NAMES daos_common
-  HINTS /usr/local/lib /usr/lib /opt/daosm/default/lib)
+  HINTS /usr/local/lib /usr/lib /opt/daos/default/lib)
 
 find_library(DAOS_TIER_LIBRARY NAMES daos_tier
-  HINTS /usr/local/lib /usr/lib /opt/daosm/default/lib)
+  HINTS /usr/local/lib /usr/lib /opt/daos/default/lib)
 
 find_path(CART_INCLUDE_DIR crt_api.h
   HINTS /usr/local/include /usr/include /opt/cart/default/include)

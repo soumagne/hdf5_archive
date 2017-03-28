@@ -45,6 +45,22 @@ set (examples
     h5_vds-percival-unlim-maxmin
 )
 
+set (daos_examples
+    h5dsm_file_create_nb
+#    h5dsm_file_create
+#    h5dsm_file_open
+#    h5dsm_group_create
+#    h5dsm_group_open
+#    h5dsm_dset_create
+#    h5dsm_dset_open
+#    h5dsm_dset_write
+#    h5dsm_dset_read
+#    h5dsm_dset_wpartial
+#    h5dsm_dset_rpartial
+#    h5dsm_dset_w1m
+#    h5dsm_dset_r1m
+)
+
 foreach (example ${examples})
   add_executable (${example} ${HDF5_EXAMPLES_SOURCE_DIR}/${example}.c)
   TARGET_NAMING (${example} STATIC)
@@ -59,6 +75,21 @@ foreach (example ${examples})
     set_target_properties (${example}-shared PROPERTIES FOLDER examples)
   endif (BUILD_SHARED_LIBS)
 endforeach (example ${examples})
+
+foreach (example ${daos_examples})
+  add_executable (${example} ${HDF5_EXAMPLES_SOURCE_DIR}/${example}.c)
+  TARGET_NAMING (${example} STATIC)
+  TARGET_C_PROPERTIES (${example} STATIC " " " ")
+  target_link_libraries (${example} ${HDF5_LIB_TARGET} uuid)
+  set_target_properties (${example} PROPERTIES FOLDER examples)
+  if (BUILD_SHARED_LIBS)
+    add_executable (${example}-shared ${HDF5_EXAMPLES_SOURCE_DIR}/${example}.c)
+    TARGET_NAMING (${example}-shared SHARED)
+    TARGET_C_PROPERTIES (${example}-shared SHARED " " " ")
+    target_link_libraries (${example}-shared ${HDF5_LIBSH_TARGET} uuid)
+    set_target_properties (${example}-shared PROPERTIES FOLDER examples)
+  endif (BUILD_SHARED_LIBS)
+endforeach (example ${daos_examples})
 
 if (H5_HAVE_PARALLEL)
   add_executable (ph5example ${HDF5_EXAMPLES_SOURCE_DIR}/ph5example.c)
