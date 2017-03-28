@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.1.0)
-PROJECT (HDF5_HL C CXX)
+PROJECT (HDF5_HL C)
 
 #-----------------------------------------------------------------------------
 # Apply Definitions to compiler in this directory and below

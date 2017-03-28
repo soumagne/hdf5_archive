@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.1.0)
-PROJECT (HDF5 C CXX)
+PROJECT (HDF5 C)
 
 #-----------------------------------------------------------------------------
 # Instructions for use : Normal Build
@@ -88,6 +88,17 @@ endif ()
 #   add_subdirectory (Utilities/hdf5-1.8)
 #-----------------------------------------------------------------------------
 string(TIMESTAMP CONFIG_DATE "%Y-%m-%d")
+
+#------------------------------------------------------------------------------
+# Set a default build type if none was specified
+#------------------------------------------------------------------------------
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to 'RelWithDebInfo' as none was specified.")
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"
+    "MinSizeRel" "RelWithDebInfo")
+endif()
 
 #-----------------------------------------------------------------------------
 # Allow Visual Studio solution directories
@@ -774,7 +785,7 @@ endif (HDF5_ALLOW_EXTERNAL_SUPPORT MATCHES "SVN" OR HDF5_ALLOW_EXTERNAL_SUPPORT 
 #-----------------------------------------------------------------------------
 # Dashboard and Testing Settings
 #-----------------------------------------------------------------------------
-option (BUILD_TESTING "Build HDF5 Unit Testing" ON)
+option (BUILD_TESTING "Build HDF5 Unit Testing" OFF)
 if (BUILD_TESTING)
   set (DART_TESTING_TIMEOUT 1200
       CACHE INTEGER
@@ -814,7 +825,7 @@ endif (BUILD_TESTING)
 # Option to build HDF5 Tools
 #-----------------------------------------------------------------------------
 if (EXISTS "${HDF5_SOURCE_DIR}/tools" AND IS_DIRECTORY "${HDF5_SOURCE_DIR}/tools")
-  option (HDF5_BUILD_TOOLS  "Build HDF5 Tools" ON)
+  option (HDF5_BUILD_TOOLS  "Build HDF5 Tools" OFF)
   if (HDF5_BUILD_TOOLS)
     add_subdirectory (${HDF5_SOURCE_DIR}/tools ${PROJECT_BINARY_DIR}/tools)
   endif (HDF5_BUILD_TOOLS)
@@ -824,7 +835,7 @@ endif (EXISTS "${HDF5_SOURCE_DIR}/tools" AND IS_DIRECTORY "${HDF5_SOURCE_DIR}/to
 # Option to build examples
 #-----------------------------------------------------------------------------
 if (EXISTS "${HDF5_SOURCE_DIR}/examples" AND IS_DIRECTORY "${HDF5_SOURCE_DIR}/examples")
-  option (HDF5_BUILD_EXAMPLES  "Build HDF5 Library Examples" ON)
+  option (HDF5_BUILD_EXAMPLES  "Build HDF5 Library Examples" OFF)
   if (HDF5_BUILD_EXAMPLES)
     add_subdirectory (${HDF5_SOURCE_DIR}/examples ${PROJECT_BINARY_DIR}/examples)
   endif (HDF5_BUILD_EXAMPLES)
@@ -834,7 +845,7 @@ endif (EXISTS "${HDF5_SOURCE_DIR}/examples" AND IS_DIRECTORY "${HDF5_SOURCE_DIR}
 # Option to build High Level API's
 #-----------------------------------------------------------------------------
 if (EXISTS "${HDF5_SOURCE_DIR}/hl" AND IS_DIRECTORY "${HDF5_SOURCE_DIR}/hl")
-  option (HDF5_BUILD_HL_LIB  "Build HIGH Level HDF5 Library" ON)
+  option (HDF5_BUILD_HL_LIB  "Build HIGH Level HDF5 Library" OFF)
   if (HDF5_BUILD_HL_LIB)
     set (H5_INCLUDE_HL 1)
     add_subdirectory (${HDF5_SOURCE_DIR}/hl ${PROJECT_BINARY_DIR}/hl)
@@ -899,7 +910,7 @@ endif (EXISTS "${HDF5_SOURCE_DIR}/fortran" AND IS_DIRECTORY "${HDF5_SOURCE_DIR}/
 # Option to build HDF5 C++ Library
 #-----------------------------------------------------------------------------
 if (EXISTS "${HDF5_SOURCE_DIR}/c++" AND IS_DIRECTORY "${HDF5_SOURCE_DIR}/c++")
-  option (HDF5_BUILD_CPP_LIB  "Build HDF5 C++ Library" ON)
+  option (HDF5_BUILD_CPP_LIB  "Build HDF5 C++ Library" OFF)
   if (HDF5_BUILD_CPP_LIB)
     # check for unsupported options
     if (HDF5_ENABLE_PARALLEL)
